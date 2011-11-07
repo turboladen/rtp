@@ -1,12 +1,10 @@
 require 'simplecov'
-require 'simplecov-rcov'
-require 'simplecov-rcov-text'
+#require 'simplecov-rcov-text'
 
 class SimpleCov::Formatter::MergedFormatter
   def format(result)
      SimpleCov::Formatter::HTMLFormatter.new.format(result)
-     SimpleCov::Formatter::RcovFormatter.new.format(result)
-     SimpleCov::Formatter::RcovTextFormatter.new.format(result)
+#     SimpleCov::Formatter::RcovTextFormatter.new.format(result)
   end
 end
 
@@ -19,4 +17,3 @@ end
 
 $:.unshift(File.dirname(__FILE__) + '/../lib')
 require 'rtp'
-require 'rspec'

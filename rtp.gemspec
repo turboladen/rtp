@@ -18,13 +18,16 @@ Gem::Specification.new do |s|
   s.test_files = Dir.glob("{features,spec}/**/*")
   s.require_paths = ["lib"]
 
+  s.add_dependency("bindata", [">= 0"])
+  s.add_dependency("log_switch", ">=0")
+
   s.add_development_dependency("bundler", [">= 0"])
   s.add_development_dependency("code_statistics", ["~> 0.2.13"])
+  s.add_development_dependency("cucumber", ["~> 1.0"])
   s.add_development_dependency("metric_fu", [">= 2.0.1"])
   s.add_development_dependency("rake", [">= 0"])
-  s.add_development_dependency("rspec", ["~> 2.6.0"])
+  s.add_development_dependency("rspec", ["~> 2.7.0"])
   s.add_development_dependency("simplecov", [">= 0"])
-  s.add_development_dependency("simplecov-rcov", [">= 0"])
   s.add_development_dependency("simplecov-rcov-text", [">= 0"])
   s.add_development_dependency("yard", [">= 0.7.2"])
 end

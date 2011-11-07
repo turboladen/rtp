@@ -1,7 +1,7 @@
 require_relative 'rtp/version'
 require 'pathname'
+require 'log_switch'
 
-# FIX Document me!
 module RTP
-  # Do something!
+  extend LogSwitch
 end
