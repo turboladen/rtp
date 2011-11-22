@@ -179,11 +179,18 @@ describe RTP::Receiver do
       subject.stop
     end
 
-    it "sets @queue back to a new Queue" do
-      queue = subject.instance_variable_get(:@queue)
+    it "sets @out_of_order_queue back to a new Queue" do
+      queue = subject.instance_variable_get(:@out_of_order_queue)
       subject.stop
-      subject.instance_variable_get(:@queue).should_not equal queue
-      subject.instance_variable_get(:@queue).should_not be_nil
+      subject.instance_variable_get(:@out_of_order_queue).should_not equal queue
+      subject.instance_variable_get(:@out_of_order_queue).should_not be_nil
+    end
+
+    it "sets @write_to_file_queue back to a new Queue" do
+      queue = subject.instance_variable_get(:@write_to_file_queue)
+      subject.stop
+      subject.instance_variable_get(:@write_to_file_queue).should_not equal queue
+      subject.instance_variable_get(:@write_to_file_queue).should_not be_nil
     end
   end
 
@@ -225,12 +232,13 @@ describe RTP::Receiver do
       end
 
       if method_set[:start_method] == "start_listener"
-        it "pushes data on to the @queue" do
+        it "pushes data on to the @write_to_file_queue" do
           RTP::Packet.stub(:read).and_return({
             "rtp_payload" => "blah" }
           )
           subject.start_listener
-          subject.instance_variable_get(:@queue).pop.should == "blah"
+          subject.instance_variable_get(:@write_to_file_queue).pop.should ==
+            { "rtp_payload" => "blah" }
         end
       end
     end

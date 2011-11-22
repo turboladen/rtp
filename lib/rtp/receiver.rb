@@ -186,6 +186,7 @@ module RTP
       RTP.log "file building? #{file_building?}"
       RTP.log "running? #{running?}"
       @out_of_order_queue = Queue.new
+      @write_to_file_queue = Queue.new
     end
 
     # Kills the +@listener+ thread and sets the variable to nil.
