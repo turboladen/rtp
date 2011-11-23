@@ -23,7 +23,7 @@ module RTP
     DEFAULT_CAPFILE_NAME = "rtp_capture.raw"
 
     # Maximum number of bytes to receive on the socket.
-    MAX_BYTES_TO_RECEIVE = 3000
+    MAX_BYTES_TO_RECEIVE = 1500
 
     # Maximum times to retry using the next greatest port number.
     MAX_PORT_NUMBER_RETRIES = 50
@@ -32,6 +32,9 @@ module RTP
     # @return [File]
     attr_accessor :rtp_file
 
+    # @return [Array<Time>] packet_timestamps The packet receipt timestamps.
+    attr_accessor :packet_timestamps
+    
     # @param [Fixnum] rtp_port The port on which to capture the RTP data.
     # @return [Fixnum]
     attr_accessor :rtp_port
@@ -52,6 +55,7 @@ module RTP
       @transport_protocol = transport_protocol
       @rtp_port = rtp_port
       @rtp_file = rtp_capture_file || Tempfile.new(DEFAULT_CAPFILE_NAME)
+      @packet_timestamps = []
       @listener = nil
       @file_builder = nil
       #@packet_sorter = nil
@@ -141,7 +145,9 @@ module RTP
         server = init_server(@transport_protocol, @rtp_port)
 
         loop do
-          data = server.recvfrom(MAX_BYTES_TO_RECEIVE).first
+          msg = server.recvmsg(MAX_BYTES_TO_RECEIVE)
+          data = msg.first
+          @packet_timestamps << msg.last.timestamp
           RTP.log "received data with size: #{data.size}"
           packet = RTP::Packet.read(data)
           RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
@@ -232,6 +238,7 @@ module RTP
       begin
         server = UDPSocket.open
         server.bind('0.0.0.0', port)
+        server.setsockopt(:SOCKET, :TIMESTAMP, true)
       rescue Errno::EADDRINUSE
         RTP.log "RTP port #{port} in use, trying #{port + 1}..."
         port += 1
@@ -256,6 +263,7 @@ module RTP
 
       begin
         server = TCPServer.new(port)
+        server.setsockopt(:SOCKET, :TIMESTAMP, true)
       rescue Errno::EADDRINUSE
         RTP.log "RTP port #{port} in use, trying #{port + 1}..."
         port += 1
