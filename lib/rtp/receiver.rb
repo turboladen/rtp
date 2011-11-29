@@ -101,6 +101,7 @@ module RTP
         loop do
           #rtp_file.write @write_to_file_queue.pop until @write_to_file_queue.empty?
           rtp_file.write @write_to_file_queue.pop["rtp_payload"] until @write_to_file_queue.empty?
+          sleep 1 # Sleep here to let the listener thread be able to listen better
         end
       end
 
@@ -145,14 +146,16 @@ module RTP
         server = init_server(@transport_protocol, @rtp_port)
 
         loop do
-          msg = server.recvmsg(MAX_BYTES_TO_RECEIVE)
-          data = msg.first
-          @packet_timestamps << msg.last.timestamp
-          RTP.log "received data with size: #{data.size}"
-          packet = RTP::Packet.read(data)
-          RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
-          #@out_of_order_queue << packet
-          @write_to_file_queue << packet
+          begin
+            msg = server.recvmsg_nonblock(MAX_BYTES_TO_RECEIVE)
+            data = msg.first
+            @packet_timestamps << msg.last.timestamp
+            RTP.log "received data with size: #{data.size}"
+            packet = RTP::Packet.read(data)
+            RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
+            #@out_of_order_queue << packet
+            @write_to_file_queue << packet
+          rescue Errno::EAGAIN; end # rescue error when no data is available to read.
         end
       end
 
@@ -239,6 +242,8 @@ module RTP
         server = UDPSocket.open
         server.bind('0.0.0.0', port)
         server.setsockopt(:SOCKET, :TIMESTAMP, true)
+        optval = [0, 1].pack("l_2")
+        server.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
       rescue Errno::EADDRINUSE
         RTP.log "RTP port #{port} in use, trying #{port + 1}..."
         port += 1
@@ -264,6 +269,8 @@ module RTP
       begin
         server = TCPServer.new(port)
         server.setsockopt(:SOCKET, :TIMESTAMP, true)
+        optval = [0, 1].pack("l_2")
+        server.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
       rescue Errno::EADDRINUSE
         RTP.log "RTP port #{port} in use, trying #{port + 1}..."
         port += 1
