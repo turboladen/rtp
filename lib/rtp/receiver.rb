@@ -32,6 +32,9 @@ module RTP
     # @return [File]
     attr_accessor :rtp_file
 
+    # @param [Boolean] strip_headers True if we want to strip the RTP headers.
+    attr_accessor :strip_headers
+
     # @return [Array<Time>] packet_timestamps The packet receipt timestamps.
     attr_accessor :packet_timestamps
     
@@ -57,10 +60,10 @@ module RTP
       @rtp_file = rtp_capture_file || Tempfile.new(DEFAULT_CAPFILE_NAME)
       @packet_timestamps = []
       @listener = nil
-      @file_builder = nil
       #@packet_sorter = nil
       @out_of_order_queue = Queue.new
       @write_to_file_queue = Queue.new
+      @strip_headers = false
     end
 
     # Initializes a server of the correct socket type.
@@ -80,33 +83,13 @@ module RTP
       server
     end
 
-    # Simply calls #start_file_builder and #start_listener.
+    # Simply calls #start_listener.
     def run
       RTP.log "Starting #{self.class} on port #{@rtp_port}..."
-
-      start_file_builder
       #start_packet_sorter
       start_listener
     end
 
-    # Starts the +@file_builder+ thread that pops data off of the Queue that
-    # #start_listener pushed data on to.  It then takes that data and writes it
-    # to +@rtp_file+.
-    #
-    # @return [Thread] The file_builder thread (+@file_builder+)
-    def start_file_builder
-      return @file_builder if file_building?
-
-      @file_builder = Thread.start(@rtp_file) do |rtp_file|
-        loop do
-          #rtp_file.write @write_to_file_queue.pop until @write_to_file_queue.empty?
-          rtp_file.write @write_to_file_queue.pop["rtp_payload"] until @write_to_file_queue.empty?
-          sleep 1 # Sleep here to let the listener thread be able to listen better
-        end
-      end
-
-      @file_builder.abort_on_exception = true
-    end
 
 =begin
     def start_packet_sorter
@@ -135,8 +118,7 @@ module RTP
 =end
 
     # Starts the +@listener+ thread that starts up the server, then takes the
-    # data received from the server and pushes it on to the +@out_of_order_queue+ so
-    # the +@file_builder+ thread can deal with it.
+    # data received from the server and pushes it on to the +@write_to_file_queue+.
     #
     # @return [Thread] The listener thread (+@listener+).
     def start_listener
@@ -154,8 +136,15 @@ module RTP
             packet = RTP::Packet.read(data)
             RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
             #@out_of_order_queue << packet
-            @write_to_file_queue << packet
-          rescue Errno::EAGAIN; end # rescue error when no data is available to read.
+            
+            if @strip_headers
+              @write_to_file_queue << packet["rtp_payload"]
+            else
+              @write_to_file_queue << data
+            end
+          rescue Errno::EAGAIN;
+            @rtp_file.write @write_to_file_queue.pop until @write_to_file_queue.empty?
+          end # rescue error when no data is available to read.
         end
       end
 
@@ -167,12 +156,6 @@ module RTP
       !@listener.nil? ? @listener.alive? : false
     end
 
-    # @return [Boolean] true if the +@file_builder+ thread is running; false if
-    #   not.
-    def file_building?
-      !@file_builder.nil? ? @file_builder.alive? : false
-    end
-
     def packet_sorting?
       !@packet_sorter.nil? ? @packet_sorter.alive? : false
     end
@@ -181,7 +164,7 @@ module RTP
     #
     # @return [Boolean] true if the run loop is running.
     def running?
-      listening? || file_building? || packet_sorting?
+      listening? || packet_sorting?
     end
 
     # Breaks out of the run loop.
@@ -191,8 +174,7 @@ module RTP
       RTP.log "listening? #{listening?}"
       #stop_packet_sorter(true)
       #RTP.log "packet sorting? #{packet_sorting?}"
-      stop_file_builder(true)
-      RTP.log "file building? #{file_building?}"
+      @rtp_file.write @write_to_file_queue.pop until @write_to_file_queue.empty?
       RTP.log "running? #{running?}"
       @out_of_order_queue = Queue.new
       @write_to_file_queue = Queue.new
@@ -215,21 +197,6 @@ module RTP
 
     #  @packet_sorter = nil
     #end
-
-    # If the object from self is still listening, this kills +@file_builder+,
-    # otherwise this waits for the +@out_of_order_queue+ and +@write_to_file_queue+
-    # to be empty (i.e. it has ordered and written out the queued up data).
-    def stop_file_builder(wait_for_flushing=false)
-      if file_building?
-      #  if !listening? || wait_for_flushing
-      #    sleep 0.1 until @out_of_order_queue.empty? && @write_to_file_queue.empty?
-      #  end
-
-        @file_builder.kill
-      end
-
-      @file_builder = nil
-    end
 
     # Sets up to receive data on a UDP socket, using +@rtp_port+.
     #
