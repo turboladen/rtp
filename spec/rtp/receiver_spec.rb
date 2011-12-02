@@ -141,9 +141,8 @@ describe RTP::Receiver do
   describe "#run" do
     after(:each) { subject.stop }
 
-    it "calls #start_file_builder and #start_listener" do
+    it "calls #start_listener" do
       subject.should_receive(:start_listener)
-      subject.should_receive(:start_file_builder)
       subject.run
     end
   end
@@ -174,11 +173,6 @@ describe RTP::Receiver do
       subject.stop
     end
 
-    it "calls #stop_file_builder" do
-      subject.should_receive(:stop_file_builder)
-      subject.stop
-    end
-
     it "sets @out_of_order_queue back to a new Queue" do
       queue = subject.instance_variable_get(:@out_of_order_queue)
       subject.stop
@@ -195,11 +189,6 @@ describe RTP::Receiver do
   end
 
   [
-    {
-      start_method: "start_file_builder",
-      stop_method: "stop_file_builder",
-      ivar: "@file_builder"
-    },
       {
         start_method: "start_listener",
         stop_method: "stop_listener",
@@ -213,7 +202,10 @@ describe RTP::Receiver do
         subject.rtp_file = rtp_file
 
         server = double "A Server"
+        mock_timestamp = double "Timestamp"
+        mock_timestamp.stub(:timestamp).and_return(Time.now)
         server.stub_chain(:recvfrom, :first).and_return("not nil")
+        server.stub(:recvmsg_nonblock).and_return(["not nil", mock_timestamp])
         subject.stub(:init_server).and_return(server)
       end
 
@@ -236,9 +228,11 @@ describe RTP::Receiver do
           RTP::Packet.stub(:read).and_return({
             "rtp_payload" => "blah" }
           )
+
+          subject.strip_headers = true
           subject.start_listener
           subject.instance_variable_get(:@write_to_file_queue).pop.should ==
-            { "rtp_payload" => "blah" }
+            "blah"
         end
       end
     end
