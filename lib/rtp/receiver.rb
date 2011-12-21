@@ -58,7 +58,6 @@ module RTP
       @packet_timestamps = []
       @listener = nil
       @file_builder = nil
-      #@packet_sorter = nil
       @out_of_order_queue = Queue.new
       @write_to_file_queue = Queue.new
     end
@@ -85,7 +84,6 @@ module RTP
       RTP.log "Starting #{self.class} on port #{@rtp_port}..."
 
       start_file_builder
-      #start_packet_sorter
       start_listener
     end
 
@@ -107,32 +105,6 @@ module RTP
       @file_builder.abort_on_exception = true
     end
 
-=begin
-    def start_packet_sorter
-      return @packet_sorter if @packet_sorter and @packet_sorter.alive?
-
-      @packet_sorter = Thread.start do
-        packet_array = []
-
-        loop do
-          if @out_of_order_queue.length > 1
-            packet_array << @out_of_order_queue.pop
-            @current_sequence_number = packet_array.first["sequence_number"]
-            packet_array << @out_of_order_queue.pop
-
-            if second_packet["sequence_number"] == first_packet["sequence_number"] + 1
-              p first_packet
-              @write_to_file_queue << first_packet["rtp_payload"]
-              first_packet = second_packet
-            else
-              RTP.log "SHIIIIIIIIT"
-            end
-          end
-        end
-      end
-    end
-=end
-
     # Starts the +@listener+ thread that starts up the server, then takes the
     # data received from the server and pushes it on to the +@out_of_order_queue+ so
     # the +@file_builder+ thread can deal with it.
@@ -148,9 +120,9 @@ module RTP
           msg = server.recvmsg(MAX_BYTES_TO_RECEIVE)
           data = msg.first
           @packet_timestamps << msg.last.timestamp
-          RTP.log "received data with size: #{data.size}"
+          RTP.log "Received data with size: #{data.size}"
           packet = RTP::Packet.read(data)
-          RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
+          RTP.log "RTP payload size: #{packet["rtp_payload"].size}"
           #@out_of_order_queue << packet
           @write_to_file_queue << packet
         end
@@ -168,10 +140,6 @@ module RTP
     #   not.
     def file_building?
       !@file_builder.nil? ? @file_builder.alive? : false
-    end
-
-    def packet_sorting?
-      !@packet_sorter.nil? ? @packet_sorter.alive? : false
     end
 
     # Returns if the #run loop is in action.
@@ -200,18 +168,6 @@ module RTP
       @listener.kill if @listener
       @listener = nil
     end
-
-    #def stop_packet_sorter(wait_for_flushing=false)
-    #  if packet_sorting?
-      #  if !listening? || wait_for_flushing
-      #    sleep 0.1 until @out_of_order_queue.empty? && @write_to_file_queue.empty?
-      #  end
-
-    #    @packet_sorter.kill
-    #  end
-
-    #  @packet_sorter = nil
-    #end
 
     # If the object from self is still listening, this kills +@file_builder+,
     # otherwise this waits for the +@out_of_order_queue+ and +@write_to_file_queue+
