@@ -146,7 +146,7 @@ module RTP
     #
     # @return [Boolean] true if the run loop is running.
     def running?
-      listening? || file_building? || packet_sorting?
+      listening? || file_building?
     end
 
     # Breaks out of the run loop.
