@@ -58,7 +58,6 @@ module RTP
       @packet_timestamps = []
       @listener = nil
       @file_builder = nil
-      @out_of_order_queue = Queue.new
       @write_to_file_queue = Queue.new
     end
 
@@ -106,7 +105,7 @@ module RTP
     end
 
     # Starts the +@listener+ thread that starts up the server, then takes the
-    # data received from the server and pushes it on to the +@out_of_order_queue+ so
+    # data received from the server and pushes it on to the +@write_to_file_queue+ so
     # the +@file_builder+ thread can deal with it.
     #
     # @return [Thread] The listener thread (+@listener+).
@@ -119,11 +118,11 @@ module RTP
         loop do
           msg = server.recvmsg(MAX_BYTES_TO_RECEIVE)
           data = msg.first
-          @packet_timestamps << msg.last.timestamp
-          RTP.log "Received data with size: #{data.size}"
+          timestamp = msg.last.timestamp
+          @packet_timestamps << timestamp
+          RTP.log "Received timestamped packet '#{timestamp}' with size '#{data.size}'"
           packet = RTP::Packet.read(data)
           RTP.log "RTP payload size: #{packet["rtp_payload"].size}"
-          #@out_of_order_queue << packet
           @write_to_file_queue << packet
         end
       end
@@ -154,12 +153,9 @@ module RTP
       RTP.log "Stopping #{self.class} on port #{@rtp_port}..."
       stop_listener
       RTP.log "listening? #{listening?}"
-      #stop_packet_sorter(true)
-      #RTP.log "packet sorting? #{packet_sorting?}"
-      stop_file_builder(true)
+      stop_file_builder
       RTP.log "file building? #{file_building?}"
       RTP.log "running? #{running?}"
-      @out_of_order_queue = Queue.new
       @write_to_file_queue = Queue.new
     end
 
@@ -170,14 +166,10 @@ module RTP
     end
 
     # If the object from self is still listening, this kills +@file_builder+,
-    # otherwise this waits for the +@out_of_order_queue+ and +@write_to_file_queue+
-    # to be empty (i.e. it has ordered and written out the queued up data).
-    def stop_file_builder(wait_for_flushing=false)
+    # otherwise this waits for the +@write_to_file_queue+
+    # to be empty (i.e. it has written out the queued up data).
+    def stop_file_builder
       if file_building?
-      #  if !listening? || wait_for_flushing
-      #    sleep 0.1 until @out_of_order_queue.empty? && @write_to_file_queue.empty?
-      #  end
-
         @file_builder.kill
       end
 
