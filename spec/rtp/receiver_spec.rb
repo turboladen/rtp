@@ -2,28 +2,9 @@ require_relative '../spec_helper'
 require 'rtp/receiver'
 
 Thread.abort_on_exception = true
-
-def use_udp_ports(range)
-  sockets = []
-
-  range.each do |port|
-    begin
-      socket = UDPSocket.open
-      socket.bind('0.0.0.0', port)
-      sockets << socket
-    rescue Errno::EADDRINUSE
-      # That's ok
-    end
-  end
-
-  sockets
-end
+RTP.log = false
 
 describe RTP::Receiver do
-  before do
-    RTP.log = false
-  end
-
   describe "#initialize" do
     context "with default parameters" do
       it "uses UDP" do
@@ -37,17 +18,23 @@ describe RTP::Receiver do
       it "creates a new Tempfile" do
         subject.instance_variable_get(:@rtp_file).should be_a Tempfile
       end
+
+      it "initializes @packet_timeatamps" do
+        subject.instance_variable_get(:@packet_timestamps).should == []
+      end
+
+      it "initializes a Queue for writing to file" do
+        subject.instance_variable_get(:@write_to_file_queue).should be_a Queue
+      end
     end
 
     context "non-default parameters" do
       it "can use TCP" do
-        capturer = RTP::Receiver.new(:TCP)
-        capturer.instance_variable_get(:@transport_protocol).should == :TCP
+        RTP::Receiver.new(:TCP).instance_variable_get(:@transport_protocol).should == :TCP
       end
 
       it "can take another port" do
-        capturer = RTP::Receiver.new(:UDP, 12345)
-        capturer.instance_variable_get(:@rtp_port).should == 12345
+        RTP::Receiver.new(:UDP, 12345).instance_variable_get(:@rtp_port).should == 12345
       end
 
       it "can take an IO object" do
@@ -59,7 +46,7 @@ describe RTP::Receiver do
     end
 
     it "isn't running" do
-      RTP::Receiver.new.should_not be_running
+      subject.should_not be_running
     end
   end
 
@@ -71,7 +58,7 @@ describe RTP::Receiver do
       end
 
       it "returns a UDPSocket" do
-        subject.init_server(:UDP).should be_a(UDPSocket)
+        subject.init_server(:UDP).should be_a UDPSocket
       end
     end
 
@@ -92,35 +79,37 @@ describe RTP::Receiver do
   end
 
   describe "#init_udp_server" do
-    after :each do
-      unless @sockets.nil?
-        @sockets.each { |s| s.close }
-      end
+    let(:udp_server) do
+      double "UDPSocket", setsockopt: nil
     end
 
     it "returns a UDPSocket" do
-      server = subject.init_udp_server(subject.rtp_port)
-      server.should be_a UDPSocket
+      subject.init_udp_server(subject.rtp_port).should be_a UDPSocket
     end
 
-    it "retries MAX_PORT_NUMBER_RETRIES to get a port" do
-      @sockets = use_udp_ports 9000...(9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES)
-      subject.init_udp_server(subject.rtp_port)
+    context "when port 9000 - 9048 are taken" do
+      it "retries MAX_PORT_NUMBER_RETRIES times then returns the UDPSocket" do
+        udp_server.should_receive(:bind).exactly(50).times.and_raise(Errno::EADDRINUSE)
+        udp_server.should_receive(:bind).with('0.0.0.0', 9050)
+        UDPSocket.stub(:open).and_return(udp_server)
 
-      subject.rtp_port.should == 9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES
+        subject.init_udp_server(9000).should == udp_server
+
+        UDPSocket.unstub(:open)
+      end
     end
 
-    context "when no available ports, it retries MAX_PORT_NUMBER_RETRIES times, then" do
+    context "when no available ports" do
       before do
-        @sockets = use_udp_ports 9000..(9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES)
+        UDPSocket.should_receive(:open).exactly(51).times.and_raise(Errno::EADDRINUSE)
       end
 
-      it "retries MAX_PORT_NUMBER_RETRIES times then raises" do
-        expect { subject.init_udp_server(subject.rtp_port) }.to raise_error Errno::EADDRINUSE
+      it "retries 50 times to get a port then allows the Errno::EADDRINUSE to raise" do
+        expect { subject.init_udp_server(9000) }.to raise_error Errno::EADDRINUSE
       end
 
       it "sets @rtp_port back to 9000 after trying all" do
-        expect { subject.init_udp_server(subject.rtp_port) }.to raise_error Errno::EADDRINUSE
+        expect { subject.init_udp_server(9000) }.to raise_error Errno::EADDRINUSE
         subject.rtp_port.should == 9000
       end
     end
@@ -139,8 +128,6 @@ describe RTP::Receiver do
   end
 
   describe "#run" do
-    after(:each) { subject.stop }
-
     it "calls #start_file_builder and #start_listener" do
       subject.should_receive(:start_listener)
       subject.should_receive(:start_file_builder)
@@ -149,22 +136,30 @@ describe RTP::Receiver do
   end
 
   describe "#running?" do
-    after(:each) { subject.stop }
-
-    it "returns false before issuing #run" do
-      subject.running?.should be_false
+    context "#listening? returns true" do
+      before { subject.stub(:listening?).and_return(true) }
+      it { should be_true }
     end
 
-    it "returns true after running" do
-      subject.run
-      subject.running?.should be_true
+    context "#listening? returns true, #file_building? returns true" do
+      before do
+        subject.stub(:listening? => true, :file_building? => true)
+        it { should be_true }
+      end
     end
 
-    it "returns false after running then stopping" do
-      subject.run
-      subject.running?.should be_true
-      subject.stop
-      subject.running?.should be_false
+    context "#listening? returns true, #file_building? returns false" do
+      before do
+        subject.stub(:listening? => true, :file_building? => false)
+        it { should be_false }
+      end
+    end
+
+    context "#listening? returns false, #file_building? returns false" do
+      before do
+        subject.stub(:listening? => false, :file_building? => false)
+        it { should be_false }
+      end
     end
   end
 
@@ -177,13 +172,6 @@ describe RTP::Receiver do
     it "calls #stop_file_builder" do
       subject.should_receive(:stop_file_builder)
       subject.stop
-    end
-
-    it "sets @out_of_order_queue back to a new Queue" do
-      queue = subject.instance_variable_get(:@out_of_order_queue)
-      subject.stop
-      subject.instance_variable_get(:@out_of_order_queue).should_not equal queue
-      subject.instance_variable_get(:@out_of_order_queue).should_not be_nil
     end
 
     it "sets @write_to_file_queue back to a new Queue" do
@@ -207,17 +195,33 @@ describe RTP::Receiver do
       }
   ].each do |method_set|
     describe "##{method_set[:start_method]}" do
-      before(:each) do
-        rtp_file = double "rtp_file"
-        rtp_file.stub(:write)
-        subject.rtp_file = rtp_file
+      let!(:server) do
+        s = double "A Server"
+        s.stub_chain(:recvmsg, :first).and_return("not nil")
+        s.stub_chain(:recvmsg, :last, :timestamp).and_return("timestamp")
 
-        server = double "A Server"
-        server.stub_chain(:recvfrom, :first).and_return("not nil")
-        subject.stub(:init_server).and_return(server)
+        s
       end
 
-      after(:each) { subject.send(method_set[:stop_method].to_sym) }
+      let!(:rtp_file) do
+        r = double "rtp_file"
+        r.stub(:write)
+
+        r
+      end
+
+      before :each do
+        subject.rtp_file = rtp_file
+        subject.stub(:init_server).and_return(server)
+        RTP::Packet.stub(:read).and_return({
+          "rtp_payload" => "blah" }
+        )
+      end
+
+      after(:each) do
+        subject.stub(:stop_listener)
+        subject.send(method_set[:stop_method].to_sym)
+      end
 
       it "starts the #{method_set[:ivar]} thread" do
         subject.send(method_set[:start_method])
@@ -232,10 +236,16 @@ describe RTP::Receiver do
       end
 
       if method_set[:start_method] == "start_listener"
+        it "starts the server" do
+          listener = double "Thread", :abort_on_exception= => nil
+          Thread.stub(:start).and_yield.and_return(listener)
+          subject.stub(:loop)
+          subject.should_receive(:init_server)
+          subject.start_listener
+          Thread.unstub(:start)
+        end
+
         it "pushes data on to the @write_to_file_queue" do
-          RTP::Packet.stub(:read).and_return({
-            "rtp_payload" => "blah" }
-          )
           subject.start_listener
           subject.instance_variable_get(:@write_to_file_queue).pop.should ==
             { "rtp_payload" => "blah" }

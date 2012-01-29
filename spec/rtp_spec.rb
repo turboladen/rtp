@@ -1,4 +1,5 @@
 require_relative 'spec_helper'
+require 'rtp'
 
 describe Kernel do
   def self.get_requires
