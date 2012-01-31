@@ -182,95 +182,189 @@ describe RTP::Receiver do
     end
   end
 
-  [
-    {
-      start_method: "start_file_builder",
-      stop_method: "stop_file_builder",
-      ivar: "@file_builder"
-    },
-      {
-        start_method: "start_listener",
-        stop_method: "stop_listener",
-        ivar: "@listener"
-      }
-  ].each do |method_set|
-    describe "##{method_set[:start_method]}" do
-      let!(:server) do
-        s = double "A Server"
-        s.stub_chain(:recvmsg, :first).and_return("not nil")
-        s.stub_chain(:recvmsg, :last, :timestamp).and_return("timestamp")
+  describe "#start_file_builder" do
+    let(:file_builder) do
+      fb = double "@file_builder"
+      fb.stub(:abort_on_exception=)
 
-        s
-      end
+      fb
+    end
 
-      let!(:rtp_file) do
-        r = double "rtp_file"
-        r.stub(:write)
-
-        r
-      end
-
-      before :each do
-        subject.rtp_file = rtp_file
-        subject.stub(:init_server).and_return(server)
-        RTP::Packet.stub(:read).and_return({
-          "rtp_payload" => "blah" }
-        )
-      end
-
-      after(:each) do
-        subject.stub(:stop_listener)
-        subject.send(method_set[:stop_method].to_sym)
-      end
-
-      it "starts the #{method_set[:ivar]} thread" do
-        subject.send(method_set[:start_method])
-        subject.instance_variable_get(method_set[:ivar].to_sym).should be_a Thread
-      end
-
-      it "returns the same #{method_set[:ivar]} if already started" do
-        subject.send(method_set[:start_method])
-        original_ivar = subject.instance_variable_get(method_set[:ivar].to_sym)
-        new_ivar = subject.send method_set[:start_method].to_sym
-        original_ivar.should equal new_ivar
-      end
-
-      if method_set[:start_method] == "start_listener"
-        it "starts the server" do
-          listener = double "Thread", :abort_on_exception= => nil
-          Thread.stub(:start).and_yield.and_return(listener)
-          subject.stub(:loop)
-          subject.should_receive(:init_server)
-          subject.start_listener
-          Thread.unstub(:start)
-        end
-
-        it "pushes data on to the @write_to_file_queue" do
-          subject.start_listener
-          subject.instance_variable_get(:@write_to_file_queue).pop.should ==
-            { "rtp_payload" => "blah" }
-        end
+    context "#file_building? is true" do
+      it "returns @file_builder" do
+        subject.instance_variable_set(:@file_builder, file_builder)
+        subject.stub(:file_building?).and_return true
+        subject.start_file_builder.should equal file_builder
       end
     end
 
-    describe "##{method_set[:stop_method]}" do
-      context "#{method_set[:ivar]} thread is running" do
-        before { subject.send(method_set[:start_method]) }
-
-        it "kills the thread" do
-          original_ivar = subject.instance_variable_get(method_set[:ivar].to_sym)
-          original_ivar.should_receive(:kill)
-          subject.send(method_set[:stop_method])
-        end
+    context "#file_building? is false" do
+      it "starts a new Thread and assigns that to @file_builder" do
+        Thread.should_receive(:start).and_return file_builder
+        subject.start_file_builder
+        subject.instance_variable_get(:@file_builder).should equal file_builder
       end
 
-      context "#{method_set[:ivar]} thread isn't running" do
-        it "doesn't try to kill the thread" do
-          allow_message_expectations_on_nil
-          original_ivar = subject.instance_variable_get(method_set[:ivar].to_sym)
-          original_ivar.should_not_receive(:kill)
-          subject.send(method_set[:stop_method])
-        end
+      it "writes 'rtp_payload' data from @write_to_file_queue until the queue is empty" do
+        write_to_file_queue = double "@write_to_file_queue"
+        write_to_file_queue.stub(:pop).and_return({"rtp_payload" => "first"},
+                                                  {"rtp_payload" => "second"})
+        write_to_file_queue.should_receive(:empty?).twice.and_return(false, true)
+        subject.instance_variable_set(:@write_to_file_queue, write_to_file_queue)
+
+        rtp_file = double "@rtp_file"
+        Thread.stub(:start).and_yield(rtp_file).and_return(file_builder)
+        subject.stub(:loop).and_yield
+        rtp_file.should_receive(:write).once
+
+        subject.start_file_builder
+
+        Thread.unstub(:start)
+      end
+    end
+
+  end
+
+  describe "#stop_file_builder" do
+    let(:file_builder) { double "@file_builder" }
+
+    it "sets @file_builder to nil" do
+      local_file_builder = "test"
+      subject.stub(:file_building?).and_return false
+      subject.instance_variable_set(:@file_builder, local_file_builder)
+      subject.stop_file_builder
+      subject.instance_variable_get(:@file_builder)
+    end
+
+    context "#file_building? is false" do
+      it "doesn't get #kill called on it" do
+        file_builder.should_not_receive(:kill)
+        subject.instance_variable_set(:@file_builder, file_builder)
+        subject.stub(:file_building?).and_return false
+        subject.stop_file_builder
+      end
+    end
+
+    context "#file_building? is true" do
+      it "gets killed" do
+        file_builder.should_receive(:kill)
+        subject.instance_variable_set(:@file_builder, file_builder)
+        subject.stub(:file_building?).and_return true
+        subject.stop_file_builder
+      end
+    end
+  end
+
+  describe "#start_listener" do
+    let(:listener) do
+      l = double "@listener"
+      l.stub(:abort_on_exception=)
+
+      l
+    end
+
+    context "#listening? is true" do
+      before { subject.stub(:listening?).and_return true }
+
+      it "returns @listener" do
+        subject.instance_variable_set(:@listener, listener)
+        subject.start_listener.should equal listener
+      end
+    end
+
+    context "#listening? is false" do
+      before { subject.stub(:listening?).and_return false }
+
+      it "starts a new Thread and assigns that to @listener" do
+        Thread.should_receive(:start).and_return listener
+        subject.start_listener
+        subject.instance_variable_get(:@listener).should equal listener
+      end
+
+      it "initializes the server socket" do
+        subject.instance_variable_set(:@listener, listener)
+        Thread.stub(:start).and_yield.and_return listener
+        subject.should_receive(:init_server)
+        subject.stub(:loop)
+
+        subject.start_listener
+
+        Thread.unstub(:start)
+      end
+
+      let!(:data) do
+        d = double "data"
+        d.stub(:size)
+
+        d
+      end
+
+      let!(:timestamp) { double "timestamp" }
+
+      let(:message) do
+        m = double "msg"
+        m.stub(:first).and_return data
+        m.stub_chain(:last, :timestamp).and_return timestamp
+
+        m
+      end
+
+      let(:server) do
+        double "Server"
+      end
+
+      it "receives data from the client and hands it to RTP::Packet to read" do
+        subject.instance_variable_set(:@listener, listener)
+        Thread.stub(:start).and_yield.and_return listener
+        server.should_receive(:recvmsg).and_return message
+        subject.should_receive(:init_server).and_return server
+        packet = double "RTP::Packet"
+        packet.stub_chain(:[], :size)
+        RTP::Packet.should_receive(:read).with(data).and_return packet
+
+        subject.start_listener
+
+        Thread.unstub(:start)
+      end
+
+      it "extracts the timestamp of the received data and adds it to @packet_timestamps" do
+        pending
+      end
+
+      it "adds the new RTP::Packet object to @write_to_file_queue" do
+        pending
+      end
+    end
+  end
+
+  describe "#stop_listener" do
+    let(:listener) { double "@listener" }
+
+    it "sets @listener to nil" do
+      local_listener = "test"
+      subject.stub(:listening?).and_return false
+      subject.instance_variable_set(:@listener, local_listener)
+      subject.stop_listener
+      subject.instance_variable_get(:@listener)
+    end
+
+    context "#listeining? is false" do
+      before { subject.stub(:listening?).and_return false }
+
+      it "doesn't get #kill called on it" do
+        listener.should_not_receive(:kill)
+        subject.instance_variable_set(:@listener, listener)
+        subject.stop_listener
+      end
+    end
+
+    context "#listening? is true" do
+      before { subject.stub(:listening?).and_return true }
+
+      it "gets killed" do
+        listener.should_receive(:kill)
+        subject.instance_variable_set(:@listener, listener)
+        subject.stop_listener
       end
     end
   end
