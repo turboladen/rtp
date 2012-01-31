@@ -109,7 +109,7 @@ module RTP
     #
     # @return [Thread] The listener thread (+@listener+).
     def start_listener
-      return @listener if @listener and @listener.alive?
+      return @listener if listening?
 
       @listener = Thread.start do
         server = init_server(@transport_protocol, @rtp_port)
@@ -160,7 +160,8 @@ module RTP
 
     # Kills the +@listener+ thread and sets the variable to nil.
     def stop_listener
-      @listener.kill if @listener
+      #@listener.kill if @listener
+      @listener.kill if listening?
       @listener = nil
     end
 
@@ -168,10 +169,7 @@ module RTP
     # otherwise this waits for the +@write_to_file_queue+
     # to be empty (i.e. it has written out the queued up data).
     def stop_file_builder
-      if file_building?
-        @file_builder.kill
-      end
-
+      @file_builder.kill if file_building?
       @file_builder = nil
     end
 
