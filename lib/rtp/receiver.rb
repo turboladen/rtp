@@ -19,7 +19,7 @@ module RTP
   # numbers on the data that's been received).
   class Receiver
 
-    # Name of the file the data will be captured to unless #rtp_file is set.
+    # Name of the file the data will be captured to unless {#rtp_file} is set.
     DEFAULT_CAPFILE_NAME = "rtp_capture.raw"
 
     # Maximum number of bytes to receive on the socket.
@@ -78,7 +78,7 @@ module RTP
       server
     end
 
-    # Simply calls #start_file_builder and #start_listener.
+    # Simply calls {#start_file_builder} and {#start_listener}.
     def run
       RTP.log "Starting #{self.class} on port #{@rtp_port}..."
 
@@ -87,16 +87,15 @@ module RTP
     end
 
     # Starts the +@file_builder+ thread that pops data off of the Queue that
-    # #start_listener pushed data on to.  It then takes that data and writes it
+    # {#start_listener} pushed data on to.  It then takes that data and writes it
     # to +@rtp_file+.
     #
-    # @return [Thread] The file_builder thread (+@file_builder+)
+    # @return [Thread] The file_builder thread (+@file_builder+).
     def start_file_builder
       return @file_builder if file_building?
 
       @file_builder = Thread.start(@rtp_file) do |rtp_file|
         loop do
-          #rtp_file.write @write_to_file_queue.pop until @write_to_file_queue.empty?
           rtp_file.write @write_to_file_queue.pop["rtp_payload"] until @write_to_file_queue.empty?
         end
       end
@@ -141,7 +140,7 @@ module RTP
       !@file_builder.nil? ? @file_builder.alive? : false
     end
 
-    # Returns if the #run loop is in action.
+    # Returns if the {#run} loop is in action.
     #
     # @return [Boolean] true if the run loop is running.
     def running?
