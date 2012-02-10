@@ -24,6 +24,8 @@ describe RTP::Receiver do
     RTP.log = false
   end
 
+  let!(:subject) { RTP::Receiver.new }
+
   describe "#initialize" do
     context "with default parameters" do
       it "uses UDP" do
@@ -242,6 +244,42 @@ describe RTP::Receiver do
           sequence_list = subject.instance_variable_get(:@sequence_list)
           sequence_list.pop.should == 12345
         end
+      end
+    end
+
+    describe "#write_buffer_to_file" do
+      before do
+        sequence_list = [54322, 54323, 54320, 54324, 54325, 54321]
+        data = []
+
+        sequence_list.each do |sequence|
+          data[sequence] = "data#{sequence}"
+        end
+
+        subject.instance_variable_set(:@sequence_list, sequence_list)
+        subject.instance_variable_set(:@payload_data, data)
+      end
+
+      it "sorts the buffer and writes to file" do
+        output =  StringIO.new
+        expected_output = "data54320data54321data54322data54323data54324data54325"
+        subject.instance_variable_set(:@rtp_file, output)
+        subject.write_buffer_to_file
+        output.string.should == expected_output
+      end
+
+      it "clears the sequence list after writing to file" do
+        output =  StringIO.new
+        subject.instance_variable_set(:@rtp_file, output)
+        subject.write_buffer_to_file
+        subject.instance_variable_get(:@sequence_list).should == []
+      end
+
+      it "clears the data buffer after writing to file" do
+        output =  StringIO.new
+        subject.instance_variable_set(:@rtp_file, output)
+        subject.write_buffer_to_file
+        subject.instance_variable_get(:@payload_data).should == []
       end
     end
 
