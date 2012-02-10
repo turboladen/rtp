@@ -173,18 +173,9 @@ describe RTP::Receiver do
       subject.stop
     end
 
-    it "sets @out_of_order_queue back to a new Queue" do
-      queue = subject.instance_variable_get(:@out_of_order_queue)
+    it "writes the buffer to file" do
+      subject.should_receive(:write_buffer_to_file)
       subject.stop
-      subject.instance_variable_get(:@out_of_order_queue).should_not equal queue
-      subject.instance_variable_get(:@out_of_order_queue).should_not be_nil
-    end
-
-    it "sets @write_to_file_queue back to a new Queue" do
-      queue = subject.instance_variable_get(:@write_to_file_queue)
-      subject.stop
-      subject.instance_variable_get(:@write_to_file_queue).should_not equal queue
-      subject.instance_variable_get(:@write_to_file_queue).should_not be_nil
     end
   end
 
@@ -224,15 +215,32 @@ describe RTP::Receiver do
       end
 
       if method_set[:start_method] == "start_listener"
-        it "pushes data on to the @write_to_file_queue" do
+        it "pushes data on to the @payload_data list" do
           RTP::Packet.stub(:read).and_return({
-            "rtp_payload" => "blah" }
+            "rtp_payload" => "blah",
+            "sequence_number" => "0"}
           )
 
           subject.strip_headers = true
+          subject.stub(:write_buffer_to_file)
           subject.start_listener
-          subject.instance_variable_get(:@write_to_file_queue).pop.should ==
-            "blah"
+          sleep 1
+          data = subject.instance_variable_get(:@payload_data)
+          data.pop.should == "blah"
+        end
+
+        it "pushes sequence number on to the @sequence_list" do
+          RTP::Packet.stub(:read).and_return({
+            "rtp_payload" => "blah",
+            "sequence_number" => "12345"}
+          )
+
+          subject.strip_headers = true
+          subject.stub(:write_buffer_to_file)
+          subject.start_listener
+          sleep 1
+          sequence_list = subject.instance_variable_get(:@sequence_list)
+          sequence_list.pop.should == 12345
         end
       end
     end
