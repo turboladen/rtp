@@ -19,12 +19,16 @@ describe RTP::Receiver do
         subject.instance_variable_get(:@rtp_file).should be_a Tempfile
       end
 
-      it "initializes @packet_timeatamps" do
+      it "initializes @packet_timestamps" do
         subject.instance_variable_get(:@packet_timestamps).should == []
       end
 
-      it "initializes a Queue for writing to file" do
-        subject.instance_variable_get(:@write_to_file_queue).should be_a Queue
+      it "initializes an Array for holding the data buffer" do
+        subject.instance_variable_get(:@payload_data).should be_a Array
+      end
+
+      it "initializes an Array for holding the sequence_list" do
+        subject.instance_variable_get(:@sequence_list).should be_a Array
       end
     end
 
@@ -128,9 +132,8 @@ describe RTP::Receiver do
   end
 
   describe "#run" do
-    it "calls #start_file_builder and #start_listener" do
+    it "calls #start_listener" do
       subject.should_receive(:start_listener)
-      subject.should_receive(:start_file_builder)
       subject.run
     end
   end
@@ -169,89 +172,9 @@ describe RTP::Receiver do
       subject.stop
     end
 
-    it "calls #stop_file_builder" do
-      subject.should_receive(:stop_file_builder)
+    it "calls #write_buffer_to_file" do
+      subject.should_receive(:write_buffer_to_file)
       subject.stop
-    end
-
-    it "sets @write_to_file_queue back to a new Queue" do
-      queue = subject.instance_variable_get(:@write_to_file_queue)
-      subject.stop
-      subject.instance_variable_get(:@write_to_file_queue).should_not equal queue
-      subject.instance_variable_get(:@write_to_file_queue).should_not be_nil
-    end
-  end
-
-  describe "#start_file_builder" do
-    let(:file_builder) do
-      fb = double "@file_builder"
-      fb.stub(:abort_on_exception=)
-
-      fb
-    end
-
-    context "#file_building? is true" do
-      it "returns @file_builder" do
-        subject.instance_variable_set(:@file_builder, file_builder)
-        subject.stub(:file_building?).and_return true
-        subject.start_file_builder.should equal file_builder
-      end
-    end
-
-    context "#file_building? is false" do
-      it "starts a new Thread and assigns that to @file_builder" do
-        Thread.should_receive(:start).and_return file_builder
-        subject.start_file_builder
-        subject.instance_variable_get(:@file_builder).should equal file_builder
-      end
-
-      it "writes 'rtp_payload' data from @write_to_file_queue until the queue is empty" do
-        write_to_file_queue = double "@write_to_file_queue"
-        write_to_file_queue.stub(:pop).and_return({"rtp_payload" => "first"},
-                                                  {"rtp_payload" => "second"})
-        write_to_file_queue.should_receive(:empty?).twice.and_return(false, true)
-        subject.instance_variable_set(:@write_to_file_queue, write_to_file_queue)
-
-        rtp_file = double "@rtp_file"
-        Thread.stub(:start).and_yield(rtp_file).and_return(file_builder)
-        subject.stub(:loop).and_yield
-        rtp_file.should_receive(:write).once
-
-        subject.start_file_builder
-
-        Thread.unstub(:start)
-      end
-    end
-
-  end
-
-  describe "#stop_file_builder" do
-    let(:file_builder) { double "@file_builder" }
-
-    it "sets @file_builder to nil" do
-      local_file_builder = "test"
-      subject.stub(:file_building?).and_return false
-      subject.instance_variable_set(:@file_builder, local_file_builder)
-      subject.stop_file_builder
-      subject.instance_variable_get(:@file_builder)
-    end
-
-    context "#file_building? is false" do
-      it "doesn't get #kill called on it" do
-        file_builder.should_not_receive(:kill)
-        subject.instance_variable_set(:@file_builder, file_builder)
-        subject.stub(:file_building?).and_return false
-        subject.stop_file_builder
-      end
-    end
-
-    context "#file_building? is true" do
-      it "gets killed" do
-        file_builder.should_receive(:kill)
-        subject.instance_variable_set(:@file_builder, file_builder)
-        subject.stub(:file_building?).and_return true
-        subject.stop_file_builder
-      end
     end
   end
 
@@ -316,11 +239,14 @@ describe RTP::Receiver do
       it "receives data from the client and hands it to RTP::Packet to read" do
         subject.instance_variable_set(:@listener, listener)
         Thread.stub(:start).and_yield.and_return listener
-        server.should_receive(:recvmsg).and_return message
+        server.should_receive(:recvmsg_nonblock).with(1500).and_return message
         subject.should_receive(:init_server).and_return server
         packet = double "RTP::Packet"
         packet.stub_chain(:[], :size)
+        packet.stub_chain(:[], :to_i).and_return(10)
         RTP::Packet.should_receive(:read).with(data).and_return packet
+        subject.stub(:write_buffer_to_file)
+        subject.stub(:loop).and_yield
 
         subject.start_listener
 
@@ -331,11 +257,82 @@ describe RTP::Receiver do
         pending
       end
 
-      it "adds the new RTP::Packet object to @write_to_file_queue" do
-        pending
+      context "@strip_headers is false" do
+        it "adds the incoming data to @payload_data buffer" do
+          subject.instance_variable_set(:@listener, listener)
+          Thread.stub(:start).and_yield.and_return listener
+          server.should_receive(:recvmsg_nonblock).with(1500).and_return message
+          subject.should_receive(:init_server).and_return server
+          packet = double "RTP::Packet"
+          packet.stub_chain(:[], :size)
+          packet.stub_chain(:[], :to_i).and_return(0)
+          RTP::Packet.stub(:read).and_return packet
+          subject.stub(:write_buffer_to_file)
+          subject.stub(:loop).and_yield
+
+          subject.start_listener
+          subject.instance_variable_get(:@payload_data).should == [data]
+          Thread.unstub(:start)
+        end
+      end
+
+      context "@strip_headers is true" do
+        it "adds the stripped data to @payload_data buffer" do
+          subject.instance_variable_set(:@listener, listener)
+          subject.instance_variable_set(:@strip_headers, true)
+          Thread.stub(:start).and_yield.and_return listener
+          server.should_receive(:recvmsg_nonblock).with(1500).and_return message
+          subject.should_receive(:init_server).and_return server
+          packet = double "RTP::Packet"
+          packet.should_receive(:[]).with("rtp_payload").twice.and_return("payload_data")
+          packet.should_receive(:[]).with("sequence_number").exactly(3).times.and_return("0")
+          RTP::Packet.stub(:read).and_return packet
+          subject.stub(:write_buffer_to_file)
+          subject.stub(:loop).and_yield
+
+          subject.start_listener
+          subject.instance_variable_get(:@payload_data).should == ["payload_data"]
+          Thread.unstub(:start)
+        end
       end
     end
   end
+
+    describe "#write_buffer_to_file" do
+      before do
+        sequence_list = [54322, 54323, 54320, 54324, 54325, 54321]
+        data = []
+
+        sequence_list.each do |sequence|
+          data[sequence] = "data#{sequence}"
+        end
+
+        subject.instance_variable_set(:@sequence_list, sequence_list)
+        subject.instance_variable_set(:@payload_data, data)
+      end
+
+      it "sorts the buffer and writes to file" do
+        output =  StringIO.new
+        expected_output = "data54320data54321data54322data54323data54324data54325"
+        subject.instance_variable_set(:@rtp_file, output)
+        subject.write_buffer_to_file
+        output.string.should == expected_output
+      end
+
+      it "clears the sequence list after writing to file" do
+        output =  StringIO.new
+        subject.instance_variable_set(:@rtp_file, output)
+        subject.write_buffer_to_file
+        subject.instance_variable_get(:@sequence_list).should == []
+      end
+
+      it "clears the data buffer after writing to file" do
+        output =  StringIO.new
+        subject.instance_variable_set(:@rtp_file, output)
+        subject.write_buffer_to_file
+        subject.instance_variable_get(:@payload_data).should == []
+      end
+    end
 
   describe "#stop_listener" do
     let(:listener) { double "@listener" }

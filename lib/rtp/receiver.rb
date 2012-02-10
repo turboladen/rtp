@@ -19,7 +19,7 @@ module RTP
   # numbers on the data that's been received).
   class Receiver
 
-    # Name of the file the data will be captured to unless {#rtp_file} is set.
+    # Name of the file the data will be captured to unless #rtp_file is set.
     DEFAULT_CAPFILE_NAME = "rtp_capture.raw"
 
     # Maximum number of bytes to receive on the socket.
@@ -31,6 +31,9 @@ module RTP
     # @param [File] rtp_file The file to capture the RTP data to.
     # @return [File]
     attr_accessor :rtp_file
+
+    # @param [Boolean] strip_headers True if you want to strip the RTP headers.
+    attr_accessor :strip_headers
 
     # @return [Array<Time>] packet_timestamps The packet receipt timestamps.
     attr_accessor :packet_timestamps
@@ -57,8 +60,9 @@ module RTP
       @rtp_file = rtp_capture_file || Tempfile.new(DEFAULT_CAPFILE_NAME)
       @packet_timestamps = []
       @listener = nil
-      @file_builder = nil
-      @write_to_file_queue = Queue.new
+      @sequence_list = []
+      @payload_data = []
+      @strip_headers = false
     end
 
     # Initializes a server of the correct socket type.
@@ -78,34 +82,15 @@ module RTP
       server
     end
 
-    # Simply calls {#start_file_builder} and {#start_listener}.
+    # Simply calls #start_listener.
     def run
       RTP.log "Starting #{self.class} on port #{@rtp_port}..."
-
-      start_file_builder
       start_listener
     end
 
-    # Starts the +@file_builder+ thread that pops data off of the Queue that
-    # {#start_listener} pushed data on to.  It then takes that data and writes it
-    # to +@rtp_file+.
-    #
-    # @return [Thread] The file_builder thread (+@file_builder+).
-    def start_file_builder
-      return @file_builder if file_building?
-
-      @file_builder = Thread.start(@rtp_file) do |rtp_file|
-        loop do
-          rtp_file.write @write_to_file_queue.pop["rtp_payload"] until @write_to_file_queue.empty?
-        end
-      end
-
-      @file_builder.abort_on_exception = true
-    end
 
     # Starts the +@listener+ thread that starts up the server, then takes the
-    # data received from the server and pushes it on to the +@write_to_file_queue+ so
-    # the +@file_builder+ thread can deal with it.
+    # data received from the server and pushes it on to the +@@payload_data+.
     #
     # @return [Thread] The listener thread (+@listener+).
     def start_listener
@@ -115,18 +100,38 @@ module RTP
         server = init_server(@transport_protocol, @rtp_port)
 
         loop do
-          msg = server.recvmsg(MAX_BYTES_TO_RECEIVE)
-          data = msg.first
-          timestamp = msg.last.timestamp
-          @packet_timestamps << timestamp
-          RTP.log "Received timestamped packet '#{timestamp}' with size '#{data.size}'"
-          packet = RTP::Packet.read(data)
-          RTP.log "RTP payload size: #{packet["rtp_payload"].size}"
-          @write_to_file_queue << packet
+          begin
+            msg = server.recvmsg_nonblock(MAX_BYTES_TO_RECEIVE)
+            data = msg.first
+            @packet_timestamps << msg.last.timestamp
+            RTP.log "received data with size: #{data.size}"
+            packet = RTP::Packet.read(data)
+            RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
+            write_buffer_to_file if @sequence_list.include? packet["sequence_number"].to_i
+            @sequence_list << packet["sequence_number"].to_i
+            
+            if @strip_headers
+              @payload_data[packet["sequence_number"].to_i] = packet["rtp_payload"]
+            else
+              @payload_data[packet["sequence_number"].to_i] = data
+            end
+          rescue Errno::EAGAIN;
+            write_buffer_to_file
+          end # rescue error when no data is available to read.
         end
       end
 
       @listener.abort_on_exception = true
+      end
+
+    # Sorts the sequence numbers and writes the data in the buffer to file.
+    def write_buffer_to_file
+      @sequence_list.sort.each do |sequence|
+        @rtp_file.write @payload_data[sequence]
+      end
+
+      @sequence_list.clear
+      @payload_data.clear
     end
 
     # @return [Boolean] true if the +@listener+ thread is running; false if not.
@@ -134,17 +139,11 @@ module RTP
       !@listener.nil? ? @listener.alive? : false
     end
 
-    # @return [Boolean] true if the +@file_builder+ thread is running; false if
-    #   not.
-    def file_building?
-      !@file_builder.nil? ? @file_builder.alive? : false
-    end
-
-    # Returns if the {#run} loop is in action.
+    # Returns if the #run loop is in action.
     #
     # @return [Boolean] true if the run loop is running.
     def running?
-      listening? || file_building?
+      listening?
     end
 
     # Breaks out of the run loop.
@@ -152,10 +151,8 @@ module RTP
       RTP.log "Stopping #{self.class} on port #{@rtp_port}..."
       stop_listener
       RTP.log "listening? #{listening?}"
-      stop_file_builder
-      RTP.log "file building? #{file_building?}"
+      write_buffer_to_file
       RTP.log "running? #{running?}"
-      @write_to_file_queue = Queue.new
     end
 
     # Kills the +@listener+ thread and sets the variable to nil.
@@ -163,14 +160,6 @@ module RTP
       #@listener.kill if @listener
       @listener.kill if listening?
       @listener = nil
-    end
-
-    # If the object from self is still listening, this kills +@file_builder+,
-    # otherwise this waits for the +@write_to_file_queue+
-    # to be empty (i.e. it has written out the queued up data).
-    def stop_file_builder
-      @file_builder.kill if file_building?
-      @file_builder = nil
     end
 
     # Sets up to receive data on a UDP socket, using +@rtp_port+.
@@ -184,6 +173,8 @@ module RTP
         server = UDPSocket.open
         server.bind('0.0.0.0', port)
         server.setsockopt(:SOCKET, :TIMESTAMP, true)
+        optval = [0, 1].pack("l_2")
+        server.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
       rescue Errno::EADDRINUSE
         RTP.log "RTP port #{port} in use, trying #{port + 1}..."
         port += 1
@@ -209,6 +200,8 @@ module RTP
       begin
         server = TCPServer.new(port)
         server.setsockopt(:SOCKET, :TIMESTAMP, true)
+        optval = [0, 1].pack("l_2")
+        server.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
       rescue Errno::EADDRINUSE
         RTP.log "RTP port #{port} in use, trying #{port + 1}..."
         port += 1
