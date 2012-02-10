@@ -3,7 +3,6 @@ require 'metric_fu'
 MetricFu::Configuration.run do |config|
   config.metrics  = [
                       :churn,
-                      :flog,
                       :flay,
                       :hotspots,
                       :rcov,
@@ -12,7 +11,6 @@ MetricFu::Configuration.run do |config|
                       :stats,
                     ]
   config.graphs   = [
-                      :flog,
                       :flay,
                       :rcov,
                       :reek,
@@ -28,22 +26,17 @@ MetricFu::Configuration.run do |config|
                         lib
                         features/step_definitions
                         features/support
+                        spec
                       ),
                       minimum_score: 10,
                       filetypes: %w(rb) 
                     } 
-  config.flog     = { 
-                      dirs_to_flog: %w(
-                        lib
-                        features/step_definitions
-                        features/support
-                      )
-                    }
-  config.reek     = { 
+  config.reek     = {
                       dirs_to_reek: %w(
                         lib
                         features/step_definitions
                         features/support
+                        spec
                       )
                     }
   config.roodi    = { 
@@ -51,9 +44,9 @@ MetricFu::Configuration.run do |config|
                         lib
                         features/step_definitions
                         features/support
+                        spec
                       ),
                       roodi_config: "tasks/roodi_config.yaml" 
                     }
-  config.rcov[:external] = 'coverage/rcov/rcov.txt'
   config.graph_engine = :bluff
 end

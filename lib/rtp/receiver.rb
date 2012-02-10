@@ -94,7 +94,7 @@ module RTP
     #
     # @return [Thread] The listener thread (+@listener+).
     def start_listener
-      return @listener if @listener and @listener.alive?
+      return @listener if listening?
 
       @listener = Thread.start do
         server = init_server(@transport_protocol, @rtp_port)
@@ -157,7 +157,8 @@ module RTP
 
     # Kills the +@listener+ thread and sets the variable to nil.
     def stop_listener
-      @listener.kill if @listener
+      #@listener.kill if @listener
+      @listener.kill if listening?
       @listener = nil
     end
 
