@@ -4,11 +4,11 @@ require 'rtp/version'
 Gem::Specification.new do |s|
   s.name = "rtp"
   s.version = RTP::VERSION
-  s.author = "Steve Loveless"
+  s.authors = ["Steve Loveless", "Sujin Philip"]
   s.homepage = %q(http://github.com/turboladen/rtp)
   s.email = %w(steve.loveless@gmail.com)
   s.description = %q(This is a pure Ruby implementation of RTP, initially geared
-  towards use with RTSP (but not limited to).)
+   towards use with RTSP (but not limited to).)
   s.summary = %q(Pure Ruby implementation of RTP)
 
   s.required_rubygems_version = ">=1.8.0"
