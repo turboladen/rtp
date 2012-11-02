@@ -37,7 +37,7 @@ module RTP
 
     # @return [Array<Time>] packet_timestamps The packet receipt timestamps.
     attr_accessor :packet_timestamps
-    
+
     # @param [Fixnum] rtp_port The port on which to capture the RTP data.
     # @return [Fixnum]
     attr_accessor :rtp_port
@@ -76,7 +76,8 @@ module RTP
       elsif protocol == :TCP
         server = init_tcp_server(port)
       else
-        raise RTP::Error, "Unknown streaming_protocol requested: #{@transport_protocol}"
+        raise RTP::Error,
+          "Unknown streaming_protocol requested: #{@transport_protocol}"
       end
 
       server
@@ -105,13 +106,19 @@ module RTP
             data = msg.first
             @packet_timestamps << msg.last.timestamp
             RTP.log "received data with size: #{data.size}"
+
             packet = RTP::Packet.read(data)
             RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
-            write_buffer_to_file if @sequence_list.include? packet["sequence_number"].to_i
+
+            if @sequence_list.include? packet["sequence_number"].to_i
+              write_buffer_to_file
+            end
+
             @sequence_list << packet["sequence_number"].to_i
-            
+
             if @strip_headers
-              @payload_data[packet["sequence_number"].to_i] = packet["rtp_payload"]
+              @payload_data[packet["sequence_number"].to_i] =
+                packet["rtp_payload"]
             else
               @payload_data[packet["sequence_number"].to_i] = data
             end
@@ -122,7 +129,7 @@ module RTP
       end
 
       @listener.abort_on_exception = true
-      end
+    end
 
     # Sorts the sequence numbers and writes the data in the buffer to file.
     def write_buffer_to_file
