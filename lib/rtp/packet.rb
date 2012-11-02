@@ -40,4 +40,3 @@ module RTP
     string :rtp_payload, read_length: lambda { bytes_remaining }
   end
 end
-
