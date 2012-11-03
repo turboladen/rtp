@@ -2,7 +2,7 @@ require_relative '../spec_helper'
 require 'rtp/receiver'
 
 Thread.abort_on_exception = true
-RTP.log = false
+RTP::Logger.log = false
 
 describe RTP::Receiver do
   describe "#initialize" do

@@ -1,7 +1,7 @@
 require 'tempfile'
 require 'socket'
 
-require_relative '../rtp'
+require_relative 'logger'
 require_relative 'error'
 require_relative 'packet'
 
@@ -18,6 +18,7 @@ module RTP
   # (objects of this type don't don't currently allow for checking RTP sequence
   # numbers on the data that's been received).
   class Receiver
+    include LogSwitch::Mixin
 
     # Name of the file the data will be captured to unless #rtp_file is set.
     DEFAULT_CAPFILE_NAME = "rtp_capture.raw"
@@ -86,7 +87,7 @@ module RTP
 
         set_socket_time_options(server)
       rescue Errno::EADDRINUSE, SocketError
-        RTP.log "RTP port #{port} in use, trying #{port + 1}..."
+        log "RTP port #{port} in use, trying #{port + 1}..."
         port += 1
         port_retries += 1
         retry until port_retries == MAX_PORT_NUMBER_RETRIES + 1
@@ -95,14 +96,14 @@ module RTP
       end
 
       @rtp_port = port
-      RTP.log "TCP server setup to receive on port #{@rtp_port}"
+      log "TCP server setup to receive on port #{@rtp_port}"
 
       server
     end
 
     # Simply calls #start_listener.
     def run
-      RTP.log "Starting #{self.class} on port #{@rtp_port}..."
+      log "Starting #{self.class} on port #{@rtp_port}..."
       start_listener
     end
 
@@ -121,10 +122,10 @@ module RTP
             msg = server.recvmsg_nonblock(MAX_BYTES_TO_RECEIVE)
             data = msg.first
             @packet_timestamps << msg.last.timestamp
-            RTP.log "received data with size: #{data.size}"
+            log "received data with size: #{data.size}"
 
             packet = RTP::Packet.read(data)
-            RTP.log "rtp payload size: #{packet["rtp_payload"].size}"
+            log "rtp payload size: #{packet["rtp_payload"].size}"
 
             if @sequence_list.include? packet["sequence_number"].to_i
               write_buffer_to_file
@@ -171,11 +172,11 @@ module RTP
 
     # Breaks out of the run loop.
     def stop
-      RTP.log "Stopping #{self.class} on port #{@rtp_port}..."
+      log "Stopping #{self.class} on port #{@rtp_port}..."
       stop_listener
-      RTP.log "listening? #{listening?}"
+      log "listening? #{listening?}"
       write_buffer_to_file
-      RTP.log "running? #{running?}"
+      log "running? #{running?}"
     end
 
     # Kills the +@listener+ thread and sets the variable to nil.
