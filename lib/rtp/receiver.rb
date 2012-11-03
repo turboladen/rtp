@@ -106,7 +106,6 @@ module RTP
       start_listener
     end
 
-
     # Starts the +@listener+ thread that starts up the server, then takes the
     # data received from the server and pushes it on to the +@@payload_data+.
     #
@@ -188,7 +187,10 @@ module RTP
 
     private
 
-    # Sets SO_TIMESTAMP socket option to true.  Sets
+    # Sets SO_TIMESTAMP socket option to true.  Sets SO_RCVTIMEO to 2.
+    #
+    # @param [Socket] socket The Socket to set options on.
+    # @return [Socket] The socket with the options set.
     def set_socket_time_options(socket)
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_TIMESTAMP, true)
       optval = [0, 1].pack("l_2")
