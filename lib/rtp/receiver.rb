@@ -71,14 +71,31 @@ module RTP
     # @raise [RTP::Error] If +@transport_protocol was not set to +:UDP+ or
     #   +:TCP+.
     def init_server(protocol, port=9000)
-      if protocol == :UDP
-        server = init_udp_server(port)
-      elsif protocol == :TCP
-        server = init_tcp_server(port)
-      else
-        raise RTP::Error,
-          "Unknown streaming_protocol requested: #{@transport_protocol}"
+      port_retries = 0
+
+      begin
+        if protocol == :UDP
+          server = UDPSocket.open
+          server.bind('0.0.0.0', port)
+        elsif protocol == :TCP
+          server = TCPServer.new(port)
+        else
+          raise RTP::Error,
+            "Unknown streaming_protocol requested: #{@transport_protocol}"
+        end
+
+        set_socket_time_options(server)
+      rescue Errno::EADDRINUSE, SocketError
+        RTP.log "RTP port #{port} in use, trying #{port + 1}..."
+        port += 1
+        port_retries += 1
+        retry until port_retries == MAX_PORT_NUMBER_RETRIES + 1
+        port = 9000
+        raise
       end
+
+      @rtp_port = port
+      RTP.log "TCP server setup to receive on port #{@rtp_port}"
 
       server
     end
@@ -169,59 +186,15 @@ module RTP
       @listener = nil
     end
 
-    # Sets up to receive data on a UDP socket, using +@rtp_port+.
-    #
-    # @param [Fixnum] port Port number to listen for RTP data on.
-    # @return [UDPSocket]
-    def init_udp_server(port)
-      port_retries = 0
+    private
 
-      begin
-        server = UDPSocket.open
-        server.bind('0.0.0.0', port)
-        server.setsockopt(:SOCKET, :TIMESTAMP, true)
-        optval = [0, 1].pack("l_2")
-        server.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
-      rescue Errno::EADDRINUSE
-        RTP.log "RTP port #{port} in use, trying #{port + 1}..."
-        port += 1
-        port_retries += 1
-        retry until port_retries == MAX_PORT_NUMBER_RETRIES + 1
-        port = 9000
-        raise
-      end
+    # Sets SO_TIMESTAMP socket option to true.  Sets
+    def set_socket_time_options(socket)
+      socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_TIMESTAMP, true)
+      optval = [0, 1].pack("l_2")
+      socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
 
-      @rtp_port = port
-      RTP.log "UDP server setup to receive on port #{@rtp_port}"
-
-      server
-    end
-
-    # Sets up to receive data on a TCP socket, using +@rtp_port+.
-    #
-    # @param [Fixnum] port Port number to listen for RTP data on.
-    # @return [TCPServer]
-    def init_tcp_server(port)
-      port_retries = 0
-
-      begin
-        server = TCPServer.new(port)
-        server.setsockopt(:SOCKET, :TIMESTAMP, true)
-        optval = [0, 1].pack("l_2")
-        server.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
-      rescue Errno::EADDRINUSE
-        RTP.log "RTP port #{port} in use, trying #{port + 1}..."
-        port += 1
-        port_retries += 1
-        retry until port_retries == MAX_PORT_NUMBER_RETRIES + 1
-        port = 9000
-        raise
-      end
-
-      @rtp_port = port
-      RTP.log "TCP server setup to receive on port #{@rtp_port}"
-
-      server
+      socket
     end
   end
 end

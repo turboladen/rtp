@@ -55,9 +55,18 @@ describe RTP::Receiver do
   end
 
   describe "#init_server" do
+    let(:udp_server) do
+      double "UDPSocket", setsockopt: nil
+    end
+
+    let(:tcp_server) do
+      double "TCPServer", setsockopt: nil
+    end
+
     context "UDP" do
       it "calls #init_udp_server with port 9000" do
-        subject.should_receive(:init_udp_server).with(9000)
+        UDPSocket.should_receive(:open).and_return udp_server
+        udp_server.should_receive(:bind).with('0.0.0.0', 9000)
         subject.init_server(:UDP)
       end
 
@@ -68,7 +77,7 @@ describe RTP::Receiver do
 
     context "TCP" do
       it "calls #init_tcp_server with port 9000" do
-        subject.should_receive(:init_tcp_server).with(9000)
+        TCPServer.should_receive(:new).with(9000).and_return tcp_server
         subject.init_server(:TCP)
       end
 
@@ -80,15 +89,11 @@ describe RTP::Receiver do
     it "raises an RTP::Error when some other protocol is given" do
       expect { subject.init_server(:BOBO) }.to raise_error RTP::Error
     end
-  end
 
-  describe "#init_udp_server" do
-    let(:udp_server) do
-      double "UDPSocket", setsockopt: nil
-    end
-
-    it "returns a UDPSocket" do
-      subject.init_udp_server(subject.rtp_port).should be_a UDPSocket
+    it "uses port a port between 9000 and 9000 + MAX_PORT_NUMBER_RETRIES" do
+      subject.init_server(:UDP, 9000)
+      subject.rtp_port.should >= 9000
+      subject.rtp_port.should <= 9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES
     end
 
     context "when port 9000 - 9048 are taken" do
@@ -97,7 +102,7 @@ describe RTP::Receiver do
         udp_server.should_receive(:bind).with('0.0.0.0', 9050)
         UDPSocket.stub(:open).and_return(udp_server)
 
-        subject.init_udp_server(9000).should == udp_server
+        subject.init_server(:UDP, 9000).should == udp_server
 
         UDPSocket.unstub(:open)
       end
@@ -109,26 +114,17 @@ describe RTP::Receiver do
       end
 
       it "retries 50 times to get a port then allows the Errno::EADDRINUSE to raise" do
-        expect { subject.init_udp_server(9000) }.to raise_error Errno::EADDRINUSE
+        expect { subject.init_server(:UDP, 9000) }.to raise_error Errno::EADDRINUSE
       end
 
       it "sets @rtp_port back to 9000 after trying all" do
-        expect { subject.init_udp_server(9000) }.to raise_error Errno::EADDRINUSE
+        expect { subject.init_server(:UDP, 9000) }.to raise_error Errno::EADDRINUSE
         subject.rtp_port.should == 9000
       end
     end
   end
 
   describe "#init_tcp_server" do
-    it "returns a TCPSocket" do
-      subject.init_tcp_server(3456).should be_a TCPSocket
-    end
-
-    it "uses port a port between 9000 and 9000 + MAX_PORT_NUMBER_RETRIES" do
-      subject.init_tcp_server(9000)
-      subject.rtp_port.should >= 9000
-      subject.rtp_port.should <= 9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES
-    end
   end
 
   describe "#run" do
