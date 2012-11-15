@@ -88,10 +88,10 @@ describe RTP::Receiver do
       subject.rtp_port.should <= 9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES
     end
 
-    context "when port 9000 - 9048 are taken" do
+    context "when port 9000 - 9098 are taken" do
       it "retries MAX_PORT_NUMBER_RETRIES times then returns the UDPSocket" do
         udp_server.should_receive(:bind).exactly(50).times.and_raise(Errno::EADDRINUSE)
-        udp_server.should_receive(:bind).with('0.0.0.0', 9050)
+        udp_server.should_receive(:bind).with('0.0.0.0', 9100)
         UDPSocket.stub(:open).and_return(udp_server)
 
         subject.init_server(:UDP, 9000).should == udp_server
