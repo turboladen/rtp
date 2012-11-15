@@ -22,14 +22,6 @@ describe RTP::Receiver do
       it "initializes @packet_timestamps" do
         subject.instance_variable_get(:@packet_timestamps).should == []
       end
-
-      it "initializes an Array for holding the data buffer" do
-        subject.instance_variable_get(:@payload_data).should be_a Array
-      end
-
-      it "initializes an Array for holding the sequence_list" do
-        subject.instance_variable_get(:@sequence_list).should be_a Array
-      end
     end
 
     context "non-default parameters" do
@@ -124,57 +116,7 @@ describe RTP::Receiver do
     end
   end
 
-  describe "#init_tcp_server" do
-  end
-
   describe "#run" do
-    it "calls #start_listener" do
-      subject.should_receive(:start_listener)
-      subject.run
-    end
-  end
-
-  describe "#running?" do
-    context "#listening? returns true" do
-      before { subject.stub(:listening?).and_return(true) }
-      it { should be_true }
-    end
-
-    context "#listening? returns true, #file_building? returns true" do
-      before do
-        subject.stub(:listening? => true, :file_building? => true)
-        it { should be_true }
-      end
-    end
-
-    context "#listening? returns true, #file_building? returns false" do
-      before do
-        subject.stub(:listening? => true, :file_building? => false)
-        it { should be_false }
-      end
-    end
-
-    context "#listening? returns false, #file_building? returns false" do
-      before do
-        subject.stub(:listening? => false, :file_building? => false)
-        it { should be_false }
-      end
-    end
-  end
-
-  describe "#stop" do
-    it "calls #stop_listener" do
-      subject.should_receive(:stop_listener)
-      subject.stop
-    end
-
-    it "calls #write_buffer_to_file" do
-      subject.should_receive(:write_buffer_to_file)
-      subject.stop
-    end
-  end
-
-  describe "#start_listener" do
     let(:listener) do
       l = double "@listener"
       l.stub(:abort_on_exception=)
@@ -187,7 +129,7 @@ describe RTP::Receiver do
 
       it "returns @listener" do
         subject.instance_variable_set(:@listener, listener)
-        subject.start_listener.should equal listener
+        subject.run.should equal listener
       end
     end
 
@@ -196,7 +138,7 @@ describe RTP::Receiver do
 
       it "starts a new Thread and assigns that to @listener" do
         Thread.should_receive(:start).and_return listener
-        subject.start_listener
+        subject.run
         subject.instance_variable_get(:@listener).should equal listener
       end
 
@@ -206,7 +148,7 @@ describe RTP::Receiver do
         subject.should_receive(:init_server)
         subject.stub(:loop)
 
-        subject.start_listener
+        subject.run
 
         Thread.unstub(:start)
       end
@@ -244,7 +186,7 @@ describe RTP::Receiver do
         subject.stub(:write_buffer_to_file)
         subject.stub(:loop).and_yield
 
-        subject.start_listener
+        subject.run
 
         Thread.unstub(:start)
       end
@@ -266,7 +208,7 @@ describe RTP::Receiver do
           subject.stub(:write_buffer_to_file)
           subject.stub(:loop).and_yield
 
-          subject.start_listener
+          subject.run
           subject.instance_variable_get(:@payload_data).should == [data]
           Thread.unstub(:start)
         end
@@ -286,7 +228,7 @@ describe RTP::Receiver do
           subject.stub(:write_buffer_to_file)
           subject.stub(:loop).and_yield
 
-          subject.start_listener
+          subject.run
           subject.instance_variable_get(:@payload_data).should == ["payload_data"]
           Thread.unstub(:start)
         end
@@ -294,71 +236,116 @@ describe RTP::Receiver do
     end
   end
 
-    describe "#write_buffer_to_file" do
-      before do
-        sequence_list = [54322, 54323, 54320, 54324, 54325, 54321]
-        data = []
-
-        sequence_list.each do |sequence|
-          data[sequence] = "data#{sequence}"
-        end
-
-        subject.instance_variable_set(:@sequence_list, sequence_list)
-        subject.instance_variable_set(:@payload_data, data)
-      end
-
-      it "sorts the buffer and writes to file" do
-        output =  StringIO.new
-        expected_output = "data54320data54321data54322data54323data54324data54325"
-        subject.instance_variable_set(:@rtp_file, output)
-        subject.write_buffer_to_file
-        output.string.should == expected_output
-      end
-
-      it "clears the sequence list after writing to file" do
-        output =  StringIO.new
-        subject.instance_variable_set(:@rtp_file, output)
-        subject.write_buffer_to_file
-        subject.instance_variable_get(:@sequence_list).should == []
-      end
-
-      it "clears the data buffer after writing to file" do
-        output =  StringIO.new
-        subject.instance_variable_set(:@rtp_file, output)
-        subject.write_buffer_to_file
-        subject.instance_variable_get(:@payload_data).should == []
-      end
+  describe "#stop" do
+    it "calls #stop_listener" do
+      subject.should_receive(:stop_listener)
+      subject.stop
     end
+
+    it "calls #stop_packet_writer" do
+      subject.should_receive(:stop_packet_writer)
+      subject.stop
+    end
+  end
+
+  describe "#listening?" do
+    context "@listner is nil" do
+      before { subject.instance_variable_set(:@listener, nil) }
+      specify { subject.should_not be_listening }
+    end
+
+    context "@listener is not nil" do
+      let(:listener) { double "@listener", :alive? => true }
+      before { subject.instance_variable_set(:@listener, listener) }
+      specify { subject.should be_listening }
+    end
+  end
+
+  describe "#writing_packets?" do
+    context "@packet_writer is nil" do
+      before { subject.instance_variable_set(:@packet_writer, nil) }
+      specify { subject.should_not be_writing_packets }
+    end
+
+    context "@packet_writer is not nil" do
+      let(:writer) { double "@packet_writer", :alive? => true }
+      before { subject.instance_variable_set(:@packet_writer, writer) }
+      specify { subject.should be_writing_packets }
+    end
+  end
+
+  describe "#running?" do
+    context "listening and writing packets" do
+      before do
+        subject.stub(:listening?).and_return(true)
+        subject.stub(:writing_packets?).and_return(true)
+      end
+
+      specify { subject.should be_running }
+    end
+
+    context "listening, not writing packets" do
+      before do
+        subject.stub(:listening?).and_return(true)
+        subject.stub(:writing_packets?).and_return(false)
+      end
+
+      specify { subject.should_not be_running }
+    end
+
+    context "not listening, writing packets" do
+      before do
+        subject.stub(:listening?).and_return(false)
+        subject.stub(:writing_packets?).and_return(true)
+      end
+
+      specify { subject.should_not be_running }
+    end
+
+    context "not listening, not writing packets" do
+      before do
+        subject.stub(:listening?).and_return(false)
+        subject.stub(:writing_packets?).and_return(false)
+      end
+
+      specify { subject.should_not be_running }
+    end
+  end
+
+
+  describe "#start_packet_writer" do
+    pending
+  end
 
   describe "#stop_listener" do
     let(:listener) { double "@listener" }
 
-    it "sets @listener to nil" do
-      local_listener = "test"
-      subject.stub(:listening?).and_return false
-      subject.instance_variable_set(:@listener, local_listener)
-      subject.stop_listener
-      subject.instance_variable_get(:@listener)
+    before do
+      subject.instance_variable_set(:@listener, listener)
     end
 
-    context "#listeining? is false" do
-      before { subject.stub(:listening?).and_return false }
-
-      it "doesn't get #kill called on it" do
-        listener.should_not_receive(:kill)
-        subject.instance_variable_set(:@listener, listener)
-        subject.stop_listener
-      end
-    end
-
-    context "#listening? is true" do
+    context "listening" do
       before { subject.stub(:listening?).and_return true }
 
-      it "gets killed" do
+      it "kills the listener and resets it" do
         listener.should_receive(:kill)
-        subject.instance_variable_set(:@listener, listener)
-        subject.stop_listener
+        subject.send(:stop_listener)
+        subject.instance_variable_get(:@listener).should be_nil
       end
     end
+
+    context "not listening" do
+      before { subject.stub(:listening?).and_return false }
+
+      it "listener doesn't get killed but is reset" do
+        listener.should_not_receive(:kill)
+        subject.send(:stop_listener)
+        subject.instance_variable_get(:@listener).should be_nil
+      end
+    end
+  end
+
+  describe "#stop_packet_writer" do
+    pending
   end
 end

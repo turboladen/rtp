@@ -1,5 +1,6 @@
 require 'tempfile'
 require 'socket'
+require 'timeout'
 
 require_relative 'logger'
 require_relative 'error'
@@ -58,11 +59,13 @@ module RTP
     def initialize(transport_protocol=:UDP, rtp_port=9000, rtp_capture_file=nil)
       @transport_protocol = transport_protocol
       @rtp_port = rtp_port
+
       @rtp_file = rtp_capture_file || Tempfile.new(DEFAULT_CAPFILE_NAME)
+
       @packet_timestamps = []
       @listener = nil
-      @sequence_list = []
-      @payload_data = []
+      @packet_writer = nil
+      @packets = Queue.new
       @strip_headers = false
     end
 
@@ -101,61 +104,54 @@ module RTP
       server
     end
 
-    # Simply calls #start_listener.
-    def run
-      log "Starting #{self.class} on port #{@rtp_port}..."
-      start_listener
-    end
-
     # Starts the +@listener+ thread that starts up the server, then takes the
-    # data received from the server and pushes it on to the +@@payload_data+.
+    # data received from the server and pushes it on to +@packets+.
+    #
+    # If a block is given, this will yield each parsed packet as an RTP::Packet.
     #
     # @return [Thread] The listener thread (+@listener+).
-    def start_listener
+    # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
+    def run(&block)
+      log "Starting #{self.class} on port #{@rtp_port}..."
       return @listener if listening?
 
-      @listener = Thread.start do
-        server = init_server(@transport_protocol, @rtp_port)
+      @packet_writer = start_packet_writer
+      @packet_writer.abort_on_exception = true
 
-        loop do
-          begin
-            msg = server.recvmsg_nonblock(MAX_BYTES_TO_RECEIVE)
-            data = msg.first
-            @packet_timestamps << msg.last.timestamp
-            log "received data with size: #{data.size}"
-
-            packet = RTP::Packet.read(data)
-            log "rtp payload size: #{packet["rtp_payload"].size}"
-
-            if @sequence_list.include? packet["sequence_number"].to_i
-              write_buffer_to_file
-            end
-
-            @sequence_list << packet["sequence_number"].to_i
-
-            if @strip_headers
-              @payload_data[packet["sequence_number"].to_i] =
-                packet["rtp_payload"]
-            else
-              @payload_data[packet["sequence_number"].to_i] = data
-            end
-          rescue Errno::EAGAIN;
-            write_buffer_to_file
-          end # rescue error when no data is available to read.
-        end
-      end
-
+      @listener = start_listener(&block)
       @listener.abort_on_exception = true
     end
 
-    # Sorts the sequence numbers and writes the data in the buffer to file.
-    def write_buffer_to_file
-      @sequence_list.sort.each do |sequence|
-        @rtp_file.write @payload_data[sequence]
-      end
+    def start_listener
+      Thread.start do
+        server = init_server(@transport_protocol, @rtp_port)
 
-      @sequence_list.clear
-      @payload_data.clear
+        loop do
+          msg = server.recvmsg(MAX_BYTES_TO_RECEIVE)
+          data = msg.first
+          log "Received data at size: #{data.size}"
+
+          log "RTP timestamp from socket info: #{msg.last.timestamp}"
+          @packet_timestamps << msg.last.timestamp
+
+          packet = RTP::Packet.read(data)
+          @packets << packet
+
+          end # rescue error when no data is available to read.
+          yield packet if block_given?
+        end
+      end
+    end
+
+    # Stops the listener and packet writer threads.
+    def stop
+      log "Stopping #{self.class} on port #{@rtp_port}..."
+      stop_listener
+      log "listening? #{listening?}"
+
+      stop_packet_writer
+      log "writing packets? #{writing_packets?}"
+      log "running? #{running?}"
     end
 
     # @return [Boolean] true if the +@listener+ thread is running; false if not.
@@ -163,30 +159,69 @@ module RTP
       !@listener.nil? ? @listener.alive? : false
     end
 
+    # @return [Boolean] true if ready to write packets to file.
+    def writing_packets?
+      !@packet_writer.nil? ? @packet_writer.alive? : false
+    end
+
     # Returns if the #run loop is in action.
     #
     # @return [Boolean] true if the run loop is running.
     def running?
-      listening?
+      listening? && writing_packets?
     end
 
-    # Breaks out of the run loop.
-    def stop
-      log "Stopping #{self.class} on port #{@rtp_port}..."
-      stop_listener
-      log "listening? #{listening?}"
-      write_buffer_to_file
-      log "running? #{running?}"
+    private
+
+    # Writes all packets on the @packets Queue to the +@rtp_file+.  If
+    #+ @strip_headers+ is set, it only writes the RTP payload to the file.
+    def start_packet_writer
+      packets = []
+
+      # If a block is given for packet inspection, perhaps we should save
+      # some I/O ano not write the packet to file?
+      Thread.start do
+        loop do
+          packets << @packets.pop
+
+          packets.each do |packet|
+            if @strip_headers
+              @rtp_file.write packet['rtp_payload']
+            else
+              @rtp_file.write packet
+            end
+          end
+        end
+      end
     end
 
     # Kills the +@listener+ thread and sets the variable to nil.
     def stop_listener
-      #@listener.kill if @listener
+      log "Stopping listener..."
       @listener.kill if listening?
       @listener = nil
+      log "Listener stopped."
     end
 
-    private
+    # Waits for all packets to be written out before killing.  If after 10
+    # seconds,
+    def stop_packet_writer
+      log "Stopping packet writer..."
+      wait_for = 10
+
+      begin
+        timeout(wait_for) do
+          sleep 0.2 until @packets.empty?
+        end
+      rescue Timeout::Error
+        log "Packet buffer not empty after #{wait_for} seconds.  Trying to stop listener..."
+        stop_listener
+      end
+
+      @packet_writer.kill if writing_packets?
+      @packet_writer = nil
+      log "Packet writer stopped."
+    end
 
     # Sets SO_TIMESTAMP socket option to true.  Sets SO_RCVTIMEO to 2.
     #
