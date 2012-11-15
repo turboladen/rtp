@@ -7,3 +7,5 @@ module RTP
 end
 
 RTP::Logger.log_class_name = true
+RTP::Logger.log = false
+
