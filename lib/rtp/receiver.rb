@@ -90,8 +90,8 @@ module RTP
 
         set_socket_time_options(server)
       rescue Errno::EADDRINUSE, SocketError
-        log "RTP port #{port} in use, trying #{port + 1}..."
-        port += 1
+        log "RTP port #{port} in use, trying #{port + 2}..."
+        port += 2
         port_retries += 1
         retry until port_retries == MAX_PORT_NUMBER_RETRIES + 1
         port = 9000
@@ -137,7 +137,6 @@ module RTP
           packet = RTP::Packet.read(data)
           @packets << packet
 
-          end # rescue error when no data is available to read.
           yield packet if block_given?
         end
       end
