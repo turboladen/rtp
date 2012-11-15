@@ -30,116 +30,75 @@ module RTP
     # Maximum times to retry using the next greatest port number.
     MAX_PORT_NUMBER_RETRIES = 50
 
-    # @param [File] rtp_file The file to capture the RTP data to.
-    # @return [File]
-    attr_accessor :rtp_file
+    MULTICAST_TTL = 4
 
-    # @param [Boolean] strip_headers True if you want to strip the RTP headers.
-    attr_accessor :strip_headers
+    # @return [File] The file to capture the RTP data to.
+    attr_reader :capture_file
 
-    # @return [Array<Time>] packet_timestamps The packet receipt timestamps.
-    attr_accessor :packet_timestamps
+    # @return [Array<Time>] The packet receipt timestamps.
+    attr_reader :packet_timestamps
 
-    # @param [Fixnum] rtp_port The port on which to capture the RTP data.
-    # @return [Fixnum]
-    attr_accessor :rtp_port
+    # @return [Fixnum] The port on which to capture RTP data.
+    attr_reader :rtp_port
 
-    # @param [Symbol] transport_protocol +:UDP+ or +:TCP+.
-    # @return [Symbol]
+    # @return [Fixnum] rtcp_port Added for clarifying the roles of ports; not
+    #   currently used though.
+    attr_reader :rtcp_port
+
+    # @return [Symbol] The type of socket to use for capturing the RTP data.
+    #   +:UDP+ or +:TCP+.
     attr_accessor :transport_protocol
 
-    # @param [Symbol] broadcast_type +:multicast+ or +:unicast+.
-    # @return [Symbol]
-    attr_accessor :broadcast_type
+    # @return [Symbol] The IP addressing type to use for capturing the data.
+    #   +:multicast+ or +:unicast:.
+    attr_accessor :ip_addressing_type
 
-    # @param [Symbol] transport_protocol The type of socket to use for capturing
+    # @param [Hash] options
+    # @option [Symbol] :transport_protocol The type of socket to use for capturing
     #   the data. +:UDP+ or +:TCP+.
-    # @param [Fixnum] rtp_port The port on which to capture RTP data.
-    # @param [File] rtp_capture_file The file object to capture the RTP data to.
-    def initialize(transport_protocol=:UDP, rtp_port=9000, rtp_capture_file=nil)
-      @transport_protocol = transport_protocol
-      @rtp_port = rtp_port
+    # @option [Symbol] :ip_addressing_type The IP addressing type to use for
+    #   capturing the data.  +:multicast+ or +:unicast:.
+    # @option [String] :multicast_address The multicast address to listen on.
+    #   Only required if the +:ip_addressing_type+ type is set to +:multicast+.
+    # @option [Fixnum] :rtp_port The port on which to capture RTP data.
+    #   #rtcp_port will be set to the next port above this.
+    # @option [Boolean] :strip_headers
+    # @option [File] :capture_file The file object to capture the RTP data to.
+    def initialize(options={})
+      @transport_protocol = options[:transport_protocol]  || :UDP
+      @ip_addressing_type = options[:ip_addressing_type]  || :unicast
+      @multicast_address  = options[:multicast_address]
+      @rtp_port           = options[:rtp_port]            || 9000
+      @rtcp_port          = @rtp_port + 1
+      @strip_headers      = options[:strip_headers]       || false
+      @capture_file = options[:capture_file] || Tempfile.new(DEFAULT_CAPFILE_NAME)
 
-      @rtp_file = rtp_capture_file || Tempfile.new(DEFAULT_CAPFILE_NAME)
-
-      @packet_timestamps = []
       @listener = nil
       @packet_writer = nil
       @packets = Queue.new
-      @strip_headers = false
+      @packet_timestamps = []
     end
 
-    # Initializes a server of the correct socket type.
-    #
-    # @return [UDPSocket, TCPSocket]
-    # @raise [RTP::Error] If +@transport_protocol was not set to +:UDP+ or
-    #   +:TCP+.
-    def init_server(protocol, port=9000)
-      port_retries = 0
-
-      begin
-        if protocol == :UDP
-          server = UDPSocket.open
-          server.bind('0.0.0.0', port)
-        elsif protocol == :TCP
-          server = TCPServer.new(port)
-        else
-          raise RTP::Error,
-            "Unknown streaming_protocol requested: #{@transport_protocol}"
-        end
-
-        set_socket_time_options(server)
-      rescue Errno::EADDRINUSE, SocketError
-        log "RTP port #{port} in use, trying #{port + 2}..."
-        port += 2
-        port_retries += 1
-        retry until port_retries == MAX_PORT_NUMBER_RETRIES + 1
-        port = 9000
-        raise
-      end
-
-      @rtp_port = port
-      log "TCP server setup to receive on port #{@rtp_port}"
-
-      server
-    end
-
-    # Starts the +@listener+ thread that starts up the server, then takes the
-    # data received from the server and pushes it on to +@packets+.
+    # Starts the packet writer (buffer) and listener.
     #
     # If a block is given, this will yield each parsed packet as an RTP::Packet.
-    #
-    # @return [Thread] The listener thread (+@listener+).
-    # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
-    def run(&block)
-      log "Starting #{self.class} on port #{@rtp_port}..."
-      return @listener if listening?
+    # This lets you inspect packets as they come in:
+    # @example
+    #   RTP::Receiver.new
+    #   receiver.start do |packet|
+    #     puts packet["sequence_number"]
+    #   end
+    def start(&block)
+      return if running?
+      log "Starting receiving on port #{@rtp_port}..."
 
       @packet_writer = start_packet_writer
       @packet_writer.abort_on_exception = true
 
-      @listener = start_listener(&block)
+      server = init_socket(@transport_protocol, @rtp_port, @ip_addressing_type)
+
+      @listener = start_listener(server, &block)
       @listener.abort_on_exception = true
-    end
-
-    def start_listener
-      Thread.start do
-        server = init_server(@transport_protocol, @rtp_port)
-
-        loop do
-          msg = server.recvmsg(MAX_BYTES_TO_RECEIVE)
-          data = msg.first
-          log "Received data at size: #{data.size}"
-
-          log "RTP timestamp from socket info: #{msg.last.timestamp}"
-          @packet_timestamps << msg.last.timestamp
-
-          packet = RTP::Packet.read(data)
-          @packets << packet
-
-          yield packet if block_given?
-        end
-      end
     end
 
     # Stops the listener and packet writer threads.
@@ -153,7 +112,7 @@ module RTP
       log "running? #{running?}"
     end
 
-    # @return [Boolean] true if the +@listener+ thread is running; false if not.
+    # @return [Boolean] true if the listener thread is running; false if not.
     def listening?
       !@listener.nil? ? @listener.alive? : false
     end
@@ -163,16 +122,20 @@ module RTP
       !@packet_writer.nil? ? @packet_writer.alive? : false
     end
 
-    # Returns if the #run loop is in action.
-    #
-    # @return [Boolean] true if the run loop is running.
+    # @return [Boolean] true if the Receiver is listening and writing packets.
     def running?
       listening? && writing_packets?
     end
 
+    # Updates the rtp_port and sets the rtcp_port to be this +1.
+    def rtp_port=(port)
+      @rtp_port = port
+      @rtcp_port = @rtp_port + 1
+    end
+
     private
 
-    # Writes all packets on the @packets Queue to the +@rtp_file+.  If
+    # Writes all packets on the @packets Queue to the +@capture_file+.  If
     #+ @strip_headers+ is set, it only writes the RTP payload to the file.
     def start_packet_writer
       packets = []
@@ -185,11 +148,80 @@ module RTP
 
           packets.each do |packet|
             if @strip_headers
-              @rtp_file.write packet['rtp_payload']
+              @capture_file.write packet['rtp_payload']
             else
-              @rtp_file.write packet
+              @capture_file.write packet
             end
           end
+        end
+      end
+    end
+
+    # Initializes a socket of the requested type.
+    #
+    # @return [UDPSocket, TCPServer]
+    # @raise [RTP::Error] If +@transport_protocol was not set to +:UDP+ or
+    #   +:TCP+.
+    def init_socket(protocol, port, ip_addressing_type, multicast_address=nil)
+      port_retries = 0
+
+      begin
+        if protocol == :UDP
+          socket = UDPSocket.open
+          socket.bind('0.0.0.0', port)
+        elsif protocol == :TCP
+          socket = TCPServer.new('0.0.0.0', port)
+        else
+          raise RTP::Error,
+            "Unknown streaming_protocol requested: #{protocol}"
+        end
+
+        set_socket_time_options(socket)
+      rescue Errno::EADDRINUSE, SocketError
+        log "RTP port #{port} in use, trying #{port + 2}..."
+        port += 2
+        port_retries += 1
+        retry until port_retries == MAX_PORT_NUMBER_RETRIES + 1
+        port = 9000
+        raise
+      end
+
+      if ip_addressing_type == :multicast
+        unless multicast_address
+          raise RTP::Error,
+            "ip_addressing_type set to :multicast, but no multicast address given."
+        end
+
+        setup_multicast_socket(socket, multicast_address)
+      end
+
+      @rtp_port = port
+      log "#{protocol} server setup to receive on port #{@rtp_port}"
+
+      socket
+    end
+
+    # Starts the thread that receives the RTP data, then takes that data and
+    # pushes it on to +@packets+ for processing.
+    #
+    # If a block is given, this will yield each parsed packet as an RTP::Packet.
+    #
+    # @param [IPSocket] socket The socket to listen on.
+    # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
+    def start_listener(socket)
+      Thread.start(socket) do
+        loop do
+          msg = socket.recvmsg(MAX_BYTES_TO_RECEIVE)
+          data = msg.first
+          log "Received data at size: #{data.size}"
+
+          log "RTP timestamp from socket info: #{msg.last.timestamp}"
+          @packet_timestamps << msg.last.timestamp
+
+          packet = RTP::Packet.read(data)
+          @packets << packet
+
+          yield packet if block_given?
         end
       end
     end
@@ -230,8 +262,31 @@ module RTP
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_TIMESTAMP, true)
       optval = [0, 1].pack("l_2")
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
+    end
 
-      socket
+    # Sets Socket options to allow for multicasting.  If ENV["RUBY_UPNP_ENV"] is
+    # equal to "testing", then it doesn't turn off multicast looping.
+    def setup_multicast_socket(socket, multicast_address)
+      set_membership(socket,
+        IPAddr.new(multicast_address).hton + IPAddr.new('0.0.0.0').hton)
+      set_multicast_ttl(socket, MULTICAST_TTL)
+      set_ttl(socket, MULTICAST_TTL)
+    end
+
+    # @param [String] membership The network byte ordered String that represents
+    #   the IP(s) that should join the membership group.
+    def set_membership(socket, membership)
+      socket.setsockopt(Socket::IPPROTO_IP, Socket::IP_ADD_MEMBERSHIP, membership)
+    end
+
+    # @param [Fixnum] ttl TTL to set IP_MULTICAST_TTL to.
+    def set_multicast_ttl(socket, ttl)
+      socket.setsockopt(Socket::IPPROTO_IP, Socket::IP_MULTICAST_TTL, [ttl].pack('i'))
+    end
+
+    # @param [Fixnum] ttl TTL to set IP_TTL to.
+    def set_ttl(socket, ttl)
+      socket.setsockopt(Socket::IPPROTO_IP, Socket::IP_TTL, [ttl].pack('i'))
     end
   end
 end

@@ -6,39 +6,12 @@ RTP::Logger.log = false
 
 describe RTP::Receiver do
   describe "#initialize" do
-    context "with default parameters" do
-      it "uses UDP" do
-        subject.instance_variable_get(:@transport_protocol).should == :UDP
-      end
-
-      it "uses port 9000" do
-        subject.instance_variable_get(:@rtp_port).should == 9000
-      end
-
-      it "creates a new Tempfile" do
-        subject.instance_variable_get(:@rtp_file).should be_a Tempfile
-      end
-
-      it "initializes @packet_timestamps" do
-        subject.instance_variable_get(:@packet_timestamps).should == []
-      end
-    end
-
-    context "non-default parameters" do
-      it "can use TCP" do
-        RTP::Receiver.new(:TCP).instance_variable_get(:@transport_protocol).should == :TCP
-      end
-
-      it "can take another port" do
-        RTP::Receiver.new(:UDP, 12345).instance_variable_get(:@rtp_port).should == 12345
-      end
-
-      it "can take an IO object" do
-        fd = IO.sysopen("/dev/null", "w")
-        io = IO.new(fd, 'w')
-        capturer = RTP::Receiver.new(:UDP, 12345, io)
-        capturer.instance_variable_get(:@rtp_file).should be_a IO
-      end
+    it "sets default values for accessors" do
+      subject.transport_protocol.should == :UDP
+      subject.ip_addressing_type.should == :unicast
+      subject.rtp_port.should == 9000
+      subject.rtcp_port.should == 9001
+      subject.capture_file.should be_a Tempfile
     end
 
     it "isn't running" do
@@ -46,192 +19,29 @@ describe RTP::Receiver do
     end
   end
 
-  describe "#init_server" do
-    let(:udp_server) do
-      double "UDPSocket", setsockopt: nil
-    end
+  describe "#start" do
+    context "running" do
+      before { subject.stub(:running?).and_return true }
 
-    let(:tcp_server) do
-      double "TCPServer", setsockopt: nil
-    end
-
-    context "UDP" do
-      it "calls #init_udp_server with port 9000" do
-        UDPSocket.should_receive(:open).and_return udp_server
-        udp_server.should_receive(:bind).with('0.0.0.0', 9000)
-        subject.init_server(:UDP)
-      end
-
-      it "returns a UDPSocket" do
-        subject.init_server(:UDP).should be_a UDPSocket
+      it "doesn't try starting anything else" do
+        subject.should_not_receive(:start_packet_writer)
+        subject.should_not_receive(:init_socket)
+        subject.should_not_receive(:start_listener)
+        subject.start
       end
     end
 
-    context "TCP" do
-      it "calls #init_tcp_server with port 9000" do
-        TCPServer.should_receive(:new).with(9000).and_return tcp_server
-        subject.init_server(:TCP)
-      end
+    context "not running" do
+      before { subject.stub(:running?).and_return false }
+      let(:packet_writer) { double "@packet_writer", :abort_on_exception= => nil }
+      let(:listener) { double "@listener", :abort_on_exception= => nil }
 
-      it "returns a TCPServer" do
-        subject.init_server(:TCP).should be_a(TCPServer)
-      end
-    end
+      it "initializes the listener socket, listener thread, and packet writer" do
+        subject.should_receive(:start_packet_writer).and_return packet_writer
+        subject.should_receive(:init_socket).with(:UDP, 9000, :unicast)
+        subject.should_receive(:start_listener).and_return packet_writer
 
-    it "raises an RTP::Error when some other protocol is given" do
-      expect { subject.init_server(:BOBO) }.to raise_error RTP::Error
-    end
-
-    it "uses port a port between 9000 and 9000 + MAX_PORT_NUMBER_RETRIES" do
-      subject.init_server(:UDP, 9000)
-      subject.rtp_port.should >= 9000
-      subject.rtp_port.should <= 9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES
-    end
-
-    context "when port 9000 - 9098 are taken" do
-      it "retries MAX_PORT_NUMBER_RETRIES times then returns the UDPSocket" do
-        udp_server.should_receive(:bind).exactly(50).times.and_raise(Errno::EADDRINUSE)
-        udp_server.should_receive(:bind).with('0.0.0.0', 9100)
-        UDPSocket.stub(:open).and_return(udp_server)
-
-        subject.init_server(:UDP, 9000).should == udp_server
-
-        UDPSocket.unstub(:open)
-      end
-    end
-
-    context "when no available ports" do
-      before do
-        UDPSocket.should_receive(:open).exactly(51).times.and_raise(Errno::EADDRINUSE)
-      end
-
-      it "retries 50 times to get a port then allows the Errno::EADDRINUSE to raise" do
-        expect { subject.init_server(:UDP, 9000) }.to raise_error Errno::EADDRINUSE
-      end
-
-      it "sets @rtp_port back to 9000 after trying all" do
-        expect { subject.init_server(:UDP, 9000) }.to raise_error Errno::EADDRINUSE
-        subject.rtp_port.should == 9000
-      end
-    end
-  end
-
-  describe "#run" do
-    let(:listener) do
-      l = double "@listener"
-      l.stub(:abort_on_exception=)
-
-      l
-    end
-
-    context "#listening? is true" do
-      before { subject.stub(:listening?).and_return true }
-
-      it "returns @listener" do
-        subject.instance_variable_set(:@listener, listener)
-        subject.run.should equal listener
-      end
-    end
-
-    context "#listening? is false" do
-      before { subject.stub(:listening?).and_return false }
-
-      it "starts a new Thread and assigns that to @listener" do
-        Thread.should_receive(:start).and_return listener
-        subject.run
-        subject.instance_variable_get(:@listener).should equal listener
-      end
-
-      it "initializes the server socket" do
-        subject.instance_variable_set(:@listener, listener)
-        Thread.stub(:start).and_yield.and_return listener
-        subject.should_receive(:init_server)
-        subject.stub(:loop)
-
-        subject.run
-
-        Thread.unstub(:start)
-      end
-
-      let!(:data) do
-        d = double "data"
-        d.stub(:size)
-
-        d
-      end
-
-      let!(:timestamp) { double "timestamp" }
-
-      let(:message) do
-        m = double "msg"
-        m.stub(:first).and_return data
-        m.stub_chain(:last, :timestamp).and_return timestamp
-
-        m
-      end
-
-      let(:server) do
-        double "Server"
-      end
-
-      it "receives data from the client and hands it to RTP::Packet to read" do
-        subject.instance_variable_set(:@listener, listener)
-        Thread.stub(:start).and_yield.and_return listener
-        server.should_receive(:recvmsg_nonblock).with(1500).and_return message
-        subject.should_receive(:init_server).and_return server
-        packet = double "RTP::Packet"
-        packet.stub_chain(:[], :size)
-        packet.stub_chain(:[], :to_i).and_return(10)
-        RTP::Packet.should_receive(:read).with(data).and_return packet
-        subject.stub(:write_buffer_to_file)
-        subject.stub(:loop).and_yield
-
-        subject.run
-
-        Thread.unstub(:start)
-      end
-
-      it "extracts the timestamp of the received data and adds it to @packet_timestamps" do
-        pending
-      end
-
-      context "@strip_headers is false" do
-        it "adds the incoming data to @payload_data buffer" do
-          subject.instance_variable_set(:@listener, listener)
-          Thread.stub(:start).and_yield.and_return listener
-          server.should_receive(:recvmsg_nonblock).with(1500).and_return message
-          subject.should_receive(:init_server).and_return server
-          packet = double "RTP::Packet"
-          packet.stub_chain(:[], :size)
-          packet.stub_chain(:[], :to_i).and_return(0)
-          RTP::Packet.stub(:read).and_return packet
-          subject.stub(:write_buffer_to_file)
-          subject.stub(:loop).and_yield
-
-          subject.run
-          subject.instance_variable_get(:@payload_data).should == [data]
-          Thread.unstub(:start)
-        end
-      end
-
-      context "@strip_headers is true" do
-        it "adds the stripped data to @payload_data buffer" do
-          subject.instance_variable_set(:@listener, listener)
-          subject.instance_variable_set(:@strip_headers, true)
-          Thread.stub(:start).and_yield.and_return listener
-          server.should_receive(:recvmsg_nonblock).with(1500).and_return message
-          subject.should_receive(:init_server).and_return server
-          packet = double "RTP::Packet"
-          packet.should_receive(:[]).with("rtp_payload").twice.and_return("payload_data")
-          packet.should_receive(:[]).with("sequence_number").exactly(3).times.and_return("0")
-          RTP::Packet.stub(:read).and_return packet
-          subject.stub(:write_buffer_to_file)
-          subject.stub(:loop).and_yield
-
-          subject.run
-          subject.instance_variable_get(:@payload_data).should == ["payload_data"]
-          Thread.unstub(:start)
-        end
+        subject.start
       end
     end
   end
@@ -312,9 +122,201 @@ describe RTP::Receiver do
     end
   end
 
+  describe "#rtp_port=" do
+    specify {
+      subject.rtp_port.should == 9000
+      subject.rtcp_port.should == 9001
+
+      subject.rtp_port = 10000
+
+      subject.rtp_port.should == 10000
+      subject.rtcp_port.should == 10001
+    }
+  end
+
+  #----------------------------------------------------------------------------
+  # PRIVATES
+  #----------------------------------------------------------------------------
 
   describe "#start_packet_writer" do
-    pending
+    let(:packet) { double "RTP::Packet" }
+
+    before do
+      Thread.stub(:start).and_yield
+      subject.stub(:loop).and_yield
+      subject.instance_variable_set(:@packets, [packet])
+    end
+
+    after do
+      Thread.unstub(:start)
+    end
+
+    context "@strip_headers is false" do
+      before { subject.instance_variable_set(:@strip_headers, false) }
+
+      it "adds the incoming data to @payload_data buffer" do
+        packet.should_not_receive(:[])
+        subject.instance_variable_get(:@capture_file).should_receive(:write).
+          with packet
+        subject.send(:start_packet_writer)
+      end
+    end
+
+    context "@strip_headers is true" do
+      before { subject.instance_variable_set(:@strip_headers, true) }
+
+      it "adds the stripped data to @payload_data buffer" do
+        packet.should_receive(:[]).with("rtp_payload").and_return("payload_data")
+        subject.instance_variable_get(:@capture_file).should_receive(:write).
+          with "payload_data"
+        subject.send(:start_packet_writer)
+      end
+    end
+  end
+
+  describe "#init_socket" do
+    let(:udp_server) do
+      double "UDPSocket", setsockopt: nil
+    end
+
+    let(:tcp_server) do
+      double "TCPServer", setsockopt: nil
+    end
+
+    context "UDP" do
+      before do
+        UDPSocket.should_receive(:open).and_return udp_server
+      end
+
+      it "returns a UDPSocket" do
+        udp_server.should_receive(:bind).with('0.0.0.0', 1234)
+        subject.send(:init_socket, :UDP, 1234, :unicast).should == udp_server
+      end
+
+      it "sets socket options to get the timestamp" do
+        udp_server.stub(:bind)
+        subject.should_receive(:set_socket_time_options).with(udp_server)
+        subject.send(:init_socket, :UDP, 1234, :unicast)
+      end
+    end
+
+    context "TCP" do
+      before do
+        TCPServer.should_receive(:new).with('0.0.0.0', 1234).and_return tcp_server
+      end
+
+      it "returns a TCPServer" do
+        subject.send(:init_socket, :TCP, 1234, :unicast).should == tcp_server
+      end
+    end
+
+    context "not UDP or TCP" do
+      it "raises an RTP::Error" do
+        expect {
+          subject.send(:init_socket, :BOBO, 1234, :blah)
+        }.to raise_error RTP::Error
+      end
+    end
+
+    it "uses port a port between 9000 and 9000 + MAX_PORT_NUMBER_RETRIES" do
+      subject.send(:init_socket, :UDP, 9000, :unicast)
+      subject.rtp_port.should >= 9000
+      subject.rtp_port.should <= 9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES
+    end
+
+    context "when port 9000 - 9098 are taken" do
+      it "retries MAX_PORT_NUMBER_RETRIES times then returns the UDPSocket" do
+        udp_server.should_receive(:bind).exactly(50).times.and_raise(Errno::EADDRINUSE)
+        udp_server.should_receive(:bind).with('0.0.0.0', 9100)
+        UDPSocket.stub(:open).and_return(udp_server)
+
+        subject.send(:init_socket, :UDP, 9000, :unicast).should == udp_server
+
+        UDPSocket.unstub(:open)
+      end
+    end
+
+    context "when no available ports" do
+      before do
+        UDPSocket.should_receive(:open).exactly(51).times.and_raise(Errno::EADDRINUSE)
+      end
+
+      it "retries 50 times to get a port then allows the Errno::EADDRINUSE to raise" do
+        expect {
+          subject.send(:init_socket, :UDP, 9000, :multicast)
+        }.to raise_error Errno::EADDRINUSE
+      end
+
+      it "sets @rtp_port back to 9000 after trying all" do
+        expect {
+          subject.send(:init_socket, :UDP, 9000, :multicast)
+        }.to raise_error Errno::EADDRINUSE
+        subject.rtp_port.should == 9000
+      end
+    end
+
+    context "multicast" do
+      context "multicast_address given" do
+        pending
+      end
+
+      context "multicast_address not given" do
+        pending
+      end
+    end
+  end
+
+  describe "#start_listener" do
+    let(:listener) do
+      l = double "Thread"
+      l.stub(:abort_on_exception=)
+
+      l
+    end
+
+    let(:data) do
+      d = double "data"
+      d.stub(:size)
+
+      d
+    end
+
+    let(:timestamp) { double "timestamp" }
+
+    let(:message) do
+      m = double "msg"
+      m.stub(:first).and_return data
+      m.stub_chain(:last, :timestamp).and_return timestamp
+
+      m
+    end
+
+    let(:socket) do
+      double "Socket", recvmsg: message
+    end
+
+    it "starts a new Thread and returns that" do
+      Thread.should_receive(:start).with(socket).and_return listener
+      subject.send(:start_listener, socket).should == listener
+    end
+
+    it "receives data from the client and hands it to RTP::Packet to read" do
+      Thread.stub(:start).and_yield
+      subject.stub(:loop).and_yield
+
+      socket.should_receive(:recvmsg).with(1500).and_return message
+
+      packet = double "RTP::Packet"
+      RTP::Packet.should_receive(:read).with(data).and_return packet
+
+      subject.send(:start_listener, socket)
+
+      Thread.unstub(:start)
+    end
+
+    it "extracts the timestamp of the received data and adds it to @packet_timestamps" do
+      pending
+    end
   end
 
   describe "#stop_listener" do

@@ -1,3 +1,34 @@
+=== 0.1.0 / 2012-11-14
+
+Lots of big changes this release!  Only a minor bump though, since I'm assuming
+that I'm about the only one using this at this point and I'm not going to mess
+anyone else up by making these changes.
+
+New features:
+* RTP::Receiver#start (used to be #run--see below) now takes an optional block
+  that will yield a parsed RTP::Packet.  This allows for inspecting packets
+  as they come in.
+* Added ability to receive on multicast sockets.  To do so, set the
+  :ip_addressing_type option to :multicast, then set :multicast_address.
+* Turned logging off by default.  To turn on, just do <tt>RTP::Logger = true</tt>.
+* Updated RTP::Logger to use log_switch 0.4.0's log_class_name feature.
+* Setting RTP::Receiver#rtp_port will now set #rtcp_port.  There's no
+  functionality behind the #rtcp_port yet; just a numerical placeholder, really.
+
+Refactorings:
+* RTP::Receiver.new now takes an options Hash instead of a bunch of params.
+* Merged RTP::Receiver#run and RTP::Receiver#start_listener.  There wasn't any
+  benefit of having them separate, and called it RTP::Receiver#start.
+* Removed all packet sorting provisions--pretty sure this shouldn't happen at
+  this level.  This means RTP::Receiver#write_buffer_to_file is gone.
+* Added a @packets Queue, dedicated to writing packets out to the capture file.
+  Besides getting out of the way of the receiving I/O, this also abstracts away
+  the writing to file logic from the receiving and parsing logic.  In a related
+  manner...
+* #strip_headers is an RTP::Receiver accessor now, so you can set
+  this to true if you only want to capture (to file) the RTP payload.
+* RTP::Receiver#init_server is now RTP::Receiver#init_socket.
+
 === 0.0.1 / 2012-03-02
 
 * Initial release.
