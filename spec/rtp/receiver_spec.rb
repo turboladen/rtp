@@ -8,9 +8,9 @@ describe RTP::Receiver do
   describe "#initialize" do
     it "sets default values for accessors" do
       subject.transport_protocol.should == :UDP
-      subject.ip_addressing_type.should == :unicast
-      subject.rtp_port.should == 9000
-      subject.rtcp_port.should == 9001
+      subject.instance_variable_get(:@ip_address).should == '0.0.0.0'
+      subject.rtp_port.should == 6970
+      subject.rtcp_port.should == 6971
       subject.capture_file.should be_a Tempfile
     end
 
@@ -38,7 +38,7 @@ describe RTP::Receiver do
 
       it "initializes the listener socket, listener thread, and packet writer" do
         subject.should_receive(:start_packet_writer).and_return packet_writer
-        subject.should_receive(:init_socket).with(:UDP, 9000, :unicast)
+        subject.should_receive(:init_socket).with(:UDP, 6970, '0.0.0.0')
         subject.should_receive(:start_listener).and_return packet_writer
 
         subject.start
@@ -124,8 +124,8 @@ describe RTP::Receiver do
 
   describe "#rtp_port=" do
     specify {
-      subject.rtp_port.should == 9000
-      subject.rtcp_port.should == 9001
+      subject.rtp_port.should == 6970
+      subject.rtcp_port.should == 6971
 
       subject.rtp_port = 10000
 
@@ -190,13 +190,13 @@ describe RTP::Receiver do
 
       it "returns a UDPSocket" do
         udp_server.should_receive(:bind).with('0.0.0.0', 1234)
-        subject.send(:init_socket, :UDP, 1234, :unicast).should == udp_server
+        subject.send(:init_socket, :UDP, 1234, '0.0.0.0').should == udp_server
       end
 
       it "sets socket options to get the timestamp" do
         udp_server.stub(:bind)
         subject.should_receive(:set_socket_time_options).with(udp_server)
-        subject.send(:init_socket, :UDP, 1234, :unicast)
+        subject.send(:init_socket, :UDP, 1234, '0.0.0.0')
       end
     end
 
@@ -206,52 +206,15 @@ describe RTP::Receiver do
       end
 
       it "returns a TCPServer" do
-        subject.send(:init_socket, :TCP, 1234, :unicast).should == tcp_server
+        subject.send(:init_socket, :TCP, 1234, '0.0.0.0').should == tcp_server
       end
     end
 
     context "not UDP or TCP" do
       it "raises an RTP::Error" do
         expect {
-          subject.send(:init_socket, :BOBO, 1234, :blah)
+          subject.send(:init_socket, :BOBO, 1234, '1.2.3.4')
         }.to raise_error RTP::Error
-      end
-    end
-
-    it "uses port a port between 9000 and 9000 + MAX_PORT_NUMBER_RETRIES" do
-      subject.send(:init_socket, :UDP, 9000, :unicast)
-      subject.rtp_port.should >= 9000
-      subject.rtp_port.should <= 9000 + RTP::Receiver::MAX_PORT_NUMBER_RETRIES
-    end
-
-    context "when port 9000 - 9098 are taken" do
-      it "retries MAX_PORT_NUMBER_RETRIES times then returns the UDPSocket" do
-        udp_server.should_receive(:bind).exactly(50).times.and_raise(Errno::EADDRINUSE)
-        udp_server.should_receive(:bind).with('0.0.0.0', 9100)
-        UDPSocket.stub(:open).and_return(udp_server)
-
-        subject.send(:init_socket, :UDP, 9000, :unicast).should == udp_server
-
-        UDPSocket.unstub(:open)
-      end
-    end
-
-    context "when no available ports" do
-      before do
-        UDPSocket.should_receive(:open).exactly(51).times.and_raise(Errno::EADDRINUSE)
-      end
-
-      it "retries 50 times to get a port then allows the Errno::EADDRINUSE to raise" do
-        expect {
-          subject.send(:init_socket, :UDP, 9000, :multicast)
-        }.to raise_error Errno::EADDRINUSE
-      end
-
-      it "sets @rtp_port back to 9000 after trying all" do
-        expect {
-          subject.send(:init_socket, :UDP, 9000, :multicast)
-        }.to raise_error Errno::EADDRINUSE
-        subject.rtp_port.should == 9000
       end
     end
 
@@ -263,6 +226,22 @@ describe RTP::Receiver do
       context "multicast_address not given" do
         pending
       end
+    end
+  end
+
+  describe "#multicast?" do
+    context "is not multicast" do
+      specify { subject.should_not be_multicast }
+    end
+
+    context "is multicast 224.0.0.0" do
+      subject { RTP::Receiver.new(6970, ip_address: '224.0.0.0') }
+      specify { subject.should be_multicast }
+    end
+
+    context "is multicast 239.255.255.255" do
+      subject { RTP::Receiver.new(6970, ip_address: '239.255.255.255') }
+      specify { subject.should be_multicast }
     end
   end
 
