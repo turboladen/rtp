@@ -79,6 +79,9 @@ module RTP
     #   +:UDP+ or +:TCP+.
     attr_accessor :transport_protocol
 
+    # @return [String] The IP address to receive RTP data on.
+    attr_accessor :ip_address
+
     # @param [Fixnum] rtp_port The port on which to capture RTP data.
     #   +rtcp_port+ will be set to the next port above this.
     #
@@ -180,6 +183,12 @@ module RTP
     # @return [Boolean] true if +ip_address+ is a unicast address or not.
     def unicast?
       !multicast?
+    end
+
+    # @return [Symbol] The IP addressing type to use for capturing the data.
+    #   +:multicast+ or +:unicast:.
+    def ip_addressing_type
+      multicast? ? :multicast : :unicast
     end
 
     private
