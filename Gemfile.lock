@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rtp (0.0.1)
+    rtp (0.1.0)
       bindata (~> 1.4)
       log_switch (>= 0.4.0)
 
