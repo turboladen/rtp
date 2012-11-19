@@ -14,6 +14,7 @@ New features:
 * Updated RTP::Logger to use log_switch 0.4.0's log_class_name feature.
 * Setting RTP::Receiver#rtp_port will now set #rtcp_port.  There's no
   functionality behind the #rtcp_port yet; just a numerical placeholder, really.
+* Use Kernel#at_exit to make sure capture files get closed and deleted.
 
 Refactorings:
 * RTP::Receiver.new now takes an options Hash instead of a bunch of params.
