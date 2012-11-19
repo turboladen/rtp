@@ -2,14 +2,16 @@
 
 Lots of big changes this release!  Only a minor bump though, since I'm assuming
 that I'm about the only one using this at this point and I'm not going to mess
-anyone else up by making these changes.
+anyone else up by making these changes.  This is how the initial release should
+have been.
 
 New features:
 * RTP::Receiver#start (used to be #run--see below) now takes an optional block
   that will yield a parsed RTP::Packet.  This allows for inspecting packets
-  as they come in.
-* Added ability to receive on multicast sockets.  To do so, set the
-  :ip_addressing_type option to :multicast, then set :multicast_address.
+  as they come in.  If a block is given, no data will be written to the capture
+  file, so as to conserve I/O.
+* Added ability to receive on multicast sockets.  To do so, just set the
+  :ip_address option on init to the multicast address you want to use.
 * Turned logging off by default.  To turn on, just do <tt>RTP::Logger = true</tt>.
 * Updated RTP::Logger to use log_switch 0.4.0's log_class_name feature.
 * Setting RTP::Receiver#rtp_port will now set #rtcp_port.  There's no

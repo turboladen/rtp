@@ -12,44 +12,6 @@ module RTP
   # Objects of this type receive RTP data over a socket and either save them to
   # a file, or yield the packets to a given block.  This is useful with other
   # protocols, like RTSP.
-  #
-  # @example Save to file
-  #
-  #   receiver = RTP::Receiver.new      # Uses a Tempfile by default
-  #   receiver.rtp_port                 # => 6790
-  #   receiver.transport_protocol       # => :UDP
-  #   receiver.multicast?               # => false
-  #   receiver.unicast?                 # => true
-  #   receiver.start
-  #   sleep 5
-  #   receiver.stop
-  #   receiver.capture_file.size        # => 2004
-  #
-  # @example Save to user-created file, with some other options
-  #
-  #   options = {
-  #     transport_protocol: :TCP,
-  #     ip_address: '239.255.255.250', # Multicast!
-  #     strip_headers: true,           # Strips RTP headers before writing to file
-  #     capture_file: File.new('data.rtp', 'wb')
-  #   }
-  #
-  #   receiver = RTP::Receiver.new(9000, options) # Receive on port 9000
-  #   receiver.start
-  #   sleep 5
-  #   receiver.stop
-  #   receiver.capture_file.size        # => 1884
-  #
-  # @example Yield packets
-  #
-  #   receiver = RTP::Receiver.new
-  #   receiver.start do |packet|
-  #     puts "Sequence number: #{packet['sequence_number']}"  # => Sequence number: 2931830
-  #   end
-  #   sleep 5
-  #   receiver.stop
-  #   receiver.capture_file.size        # => 0
-  #
   class Receiver
     include LogSwitch::Mixin
 
