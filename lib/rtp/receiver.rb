@@ -176,7 +176,7 @@ module RTP
       # some I/O ano not write the packet to file?
       Thread.start do
         loop do
-          packet = @packets.pop
+          packet = RTP::Packet.read(@packets.pop)
           data_to_write = @strip_headers ? packet['rtp_payload'] : packet
 
           if block_given?
@@ -231,11 +231,7 @@ module RTP
 
           log "RTP timestamp from socket info: #{msg.last.timestamp}"
           @packet_timestamps << msg.last.timestamp
-
-          packet = RTP::Packet.read(data)
-          @packets << packet
-
-          yield packet if block_given?
+          @packets << data
         end
       end
     end
