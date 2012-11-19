@@ -104,6 +104,16 @@ module RTP
       @capture_file       = options[:capture_file]        ||
         Tempfile.new(DEFAULT_CAPFILE_NAME)
 
+      at_exit do
+        if @capture_file.closed?
+          puts "Capture file already closed."
+        else
+          puts "Closing and deleting capture capture file..."
+          @capture_file.close
+          @capture_file.unlink
+        end
+      end
+
       @listener = nil
       @packet_writer = nil
       @packets = Queue.new
@@ -302,6 +312,8 @@ module RTP
       @packet_writer.kill if writing_packets?
       @packet_writer = nil
       log "Packet writer stopped."
+
+      @capture_file.close
 
       !writing_packets?
     end
