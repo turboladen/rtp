@@ -145,6 +145,7 @@ describe RTP::Receiver do
       Thread.stub(:start).and_yield
       subject.stub(:loop).and_yield
       subject.instance_variable_set(:@packets, [packet])
+      RTP::Packet.should_receive(:read).and_return packet
     end
 
     after do
@@ -154,7 +155,7 @@ describe RTP::Receiver do
     context "@strip_headers is false" do
       before { subject.instance_variable_set(:@strip_headers, false) }
 
-      it "adds the incoming data to @payload_data buffer" do
+      it "adds the incoming data to @packets Queue" do
         packet.should_not_receive(:[])
         subject.instance_variable_get(:@capture_file).should_receive(:write).
           with packet
@@ -279,14 +280,11 @@ describe RTP::Receiver do
       subject.send(:start_listener, socket).should == listener
     end
 
-    it "receives data from the client and hands it to RTP::Packet to read" do
+    it "receives data from the client" do
       Thread.stub(:start).and_yield
       subject.stub(:loop).and_yield
 
       socket.should_receive(:recvmsg).with(1500).and_return message
-
-      packet = double "RTP::Packet"
-      RTP::Packet.should_receive(:read).with(data).and_return packet
 
       subject.send(:start_listener, socket)
 
