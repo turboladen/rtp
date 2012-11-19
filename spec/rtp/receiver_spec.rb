@@ -235,12 +235,12 @@ describe RTP::Receiver do
     end
 
     context "is multicast 224.0.0.0" do
-      subject { RTP::Receiver.new(6970, ip_address: '224.0.0.0') }
+      subject { RTP::Receiver.new(ip_address: '224.0.0.0') }
       specify { subject.should be_multicast }
     end
 
     context "is multicast 239.255.255.255" do
-      subject { RTP::Receiver.new(6970, ip_address: '239.255.255.255') }
+      subject { RTP::Receiver.new(ip_address: '239.255.255.255') }
       specify { subject.should be_multicast }
     end
   end

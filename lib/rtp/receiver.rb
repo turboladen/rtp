@@ -82,10 +82,9 @@ module RTP
     # @return [String] The IP address to receive RTP data on.
     attr_accessor :ip_address
 
-    # @param [Fixnum] rtp_port The port on which to capture RTP data.
-    #   +rtcp_port+ will be set to the next port above this.
-    #
     # @param [Hash] options
+    # @option options [Fixnum] :rtp_port The port on which to capture RTP data.
+    #   +rtcp_port+ will be set to the next port above this.
     # @option options [Symbol] :transport_protocol The type of socket to use for
     #   capturing the data. +:UDP+ or +:TCP+.
     # @option options [String] :ip_address The IP address to open the socket on.
@@ -94,14 +93,13 @@ module RTP
     #   be stripped from packets before they're written to the capture file.
     # @option options [File] :capture_file The file object to capture the RTP
     #   data to.
-    def initialize(rtp_port=6970, options={})
-      @rtp_port           = rtp_port
+    def initialize(options={})
+      @rtp_port           = options[:rtp_port]           || 6970
       @rtcp_port          = @rtp_port + 1
-
-      @transport_protocol = options[:transport_protocol]  || :UDP
-      @ip_address         = options[:ip_address]          || '0.0.0.0'
-      @strip_headers      = options[:strip_headers]       || false
-      @capture_file       = options[:capture_file]        ||
+      @transport_protocol = options[:transport_protocol] || :UDP
+      @ip_address         = options[:ip_address]         || '0.0.0.0'
+      @strip_headers      = options[:strip_headers]      || false
+      @capture_file       = options[:capture_file]       ||
         Tempfile.new(DEFAULT_CAPFILE_NAME)
 
       at_exit do
