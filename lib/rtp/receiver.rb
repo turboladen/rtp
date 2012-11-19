@@ -207,23 +207,20 @@ module RTP
     #
     # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
     # @return [Thread] The packet writer thread.
-    def start_packet_writer(&block)
-      packets = []
+    def start_packet_writer
+      return @packet_writer if @packet_writer
 
       # If a block is given for packet inspection, perhaps we should save
       # some I/O ano not write the packet to file?
       Thread.start do
         loop do
-          packets << @packets.pop
+          packet = @packets.pop
+          data_to_write = @strip_headers ? packet['rtp_payload'] : packet
 
-          packets.each do |packet|
-            data_to_write = @strip_headers ? packet['rtp_payload'] : packet
-
-            if block_given?
-              yield data_to_write
-            else
-              @capture_file.write(data_to_write)
-            end
+          if block_given?
+            yield data_to_write
+          else
+            @capture_file.write(data_to_write)
           end
         end
       end
@@ -262,6 +259,8 @@ module RTP
     # @param [IPSocket] socket The socket to listen on.
     # @return [Thread] The listener thread.
     def start_listener(socket)
+      return @listener if @listener
+
       Thread.start(socket) do
         loop do
           msg = socket.recvmsg(MAX_BYTES_TO_RECEIVE)
