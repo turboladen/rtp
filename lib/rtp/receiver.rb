@@ -105,9 +105,7 @@ module RTP
         Tempfile.new(DEFAULT_CAPFILE_NAME)
 
       at_exit do
-        if @capture_file.closed?
-          puts "Capture file already closed."
-        else
+        unless @capture_file.closed?
           puts "Closing and deleting capture capture file..."
           @capture_file.close
           @capture_file.unlink
@@ -137,12 +135,12 @@ module RTP
       return if running?
       log "Starting receiving on port #{@rtp_port}..."
 
-      @packet_writer = start_packet_writer
+      @packet_writer = start_packet_writer(&block)
       @packet_writer.abort_on_exception = true
 
       server = init_socket(@transport_protocol, @rtp_port, @ip_address)
 
-      @listener = start_listener(server, &block)
+      @listener = start_listener(server)
       @listener.abort_on_exception = true
 
       running?
@@ -203,11 +201,15 @@ module RTP
 
     private
 
-    # Writes all received packets (in the @packets Queue} to the +capture_file+.
-    # If +strip_headers+ is set, it only writes the RTP payload to the file.
+    # This starts a new Thread for reading packets off of the list of packets
+    # that has been read in by the listener.  If no block is given, this writes
+    # all received packets (in the @packets Queue) to the +capture_file+.  If a
+    # block is given, it yields each packet, parsed as an RTP::Packet.  If
+    # +strip_headers+ is set, it only writes/yields the RTP payload to the file.
     #
+    # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
     # @return [Thread] The packet writer thread.
-    def start_packet_writer
+    def start_packet_writer(&block)
       packets = []
 
       # If a block is given for packet inspection, perhaps we should save
@@ -217,10 +219,12 @@ module RTP
           packets << @packets.pop
 
           packets.each do |packet|
-            if @strip_headers
-              @capture_file.write packet['rtp_payload']
+            data_to_write = @strip_headers ? packet['rtp_payload'] : packet
+
+            if block_given?
+              yield data_to_write
             else
-              @capture_file.write packet
+              @capture_file.write(data_to_write)
             end
           end
         end
@@ -257,10 +261,7 @@ module RTP
     # Starts the thread that receives the RTP data, then takes that data and
     # pushes it on to +@packets+ for processing.
     #
-    # If a block is given, this will yield each parsed packet as an RTP::Packet.
-    #
     # @param [IPSocket] socket The socket to listen on.
-    # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
     # @return [Thread] The listener thread.
     def start_listener(socket)
       Thread.start(socket) do
