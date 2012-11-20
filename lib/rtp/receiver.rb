@@ -179,7 +179,7 @@ module RTP
       Thread.start do
         loop do
           packet = RTP::Packet.read(@packets.pop)
-          data_to_write = @strip_headers ? packet['rtp_payload'] : packet
+          data_to_write = @strip_headers ? packet.rtp_payload : packet
 
           if block_given?
             yield data_to_write

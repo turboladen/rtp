@@ -66,7 +66,7 @@ To inspect (and do what you like with) packets as they come in...
 
   receiver = RTP::Receiver.new
   receiver.start do |packet|
-    puts "Sequence number: #{packet['sequence_number']}"  # => Sequence number: 2931830
+    puts "Sequence number: #{packet.sequence_number}"  # => Sequence number: 2931830
   end
   sleep 5
   receiver.stop
