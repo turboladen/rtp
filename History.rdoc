@@ -29,7 +29,7 @@ Refactorings:
   the writing to file logic from the receiving and parsing logic.  In a related
   manner...
 * #strip_headers is an RTP::Receiver accessor now, so you can set
-  this to true if you only want to capture (to file) the RTP payload.
+  this to true if you only want to capture/yield the RTP payload.
 * RTP::Receiver#init_server is now RTP::Receiver#init_socket.
 * Removed port retrying for RTP::Receiver; if the port requested for use by the
   Receiver is in use, I don't think it should be the role of the Receiver to try
