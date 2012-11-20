@@ -20,8 +20,8 @@ New features:
 
 Refactorings:
 * RTP::Receiver.new now takes an options Hash instead of a bunch of params.
-* Merged RTP::Receiver#run and RTP::Receiver#start_listener.  There wasn't any
-  benefit of having them separate, and called it RTP::Receiver#start.
+* Merged RTP::Receiver#run and RTP::Receiver#start_listener into
+  RTP::Receiver#start.  There wasn't any benefit of having them separate.
 * Removed all packet sorting provisions--pretty sure this shouldn't happen at
   this level.  This means RTP::Receiver#write_buffer_to_file is gone.
 * Added a @packets Queue, dedicated to writing packets out to the capture file.
