@@ -2,6 +2,8 @@
 
 http://github.com/turboladen/rtp
 
+{<img src="https://secure.travis-ci.org/turboladen/rtp.png?branch=master" alt="Build Status" />}[https://travis-ci.org/turboladen/rtp]
+
 == DESCRIPTION
 
 This is a RTP library that provides the most basic features of the Real-Time
