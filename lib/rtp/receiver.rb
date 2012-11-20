@@ -92,7 +92,7 @@ module RTP
     #
     # @return [Boolean] true if started sucessfully.
     def start(&block)
-      return if running?
+      return false if running?
       log "Starting receiving on port #{@rtp_port}..."
 
       @packet_writer = start_packet_writer(&block)
@@ -110,6 +110,8 @@ module RTP
     #
     # @return [Boolean] true if stopped sucessfully.
     def stop
+      return false if !running?
+
       log "Stopping #{self.class} on port #{@rtp_port}..."
       stop_listener
       log "listening? #{listening?}"
