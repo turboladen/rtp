@@ -90,7 +90,7 @@ module RTP
     #
     # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
     #
-    # @return [Boolean] true if started sucessfully.
+    # @return [Boolean] true if started successfully.
     def start(&block)
       return false if running?
       log "Starting receiving on port #{@rtp_port}..."
