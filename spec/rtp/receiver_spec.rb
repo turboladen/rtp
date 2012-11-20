@@ -47,14 +47,23 @@ describe RTP::Receiver do
   end
 
   describe "#stop" do
-    it "calls #stop_listener" do
-      subject.should_receive(:stop_listener)
-      subject.stop
+    context "running" do
+      before { subject.stub(:running?).and_return true }
+
+      it "calls #stop_listener" do
+        subject.should_receive(:stop_listener)
+        subject.stop
+      end
+
+      it "calls #stop_packet_writer" do
+        subject.should_receive(:stop_packet_writer)
+        subject.stop
+      end
     end
 
-    it "calls #stop_packet_writer" do
-      subject.should_receive(:stop_packet_writer)
-      subject.stop
+    context "not running" do
+      before { subject.stub(:running?).and_return false }
+      specify { subject.stop.should be_false }
     end
   end
 
@@ -139,39 +148,51 @@ describe RTP::Receiver do
   #----------------------------------------------------------------------------
 
   describe "#start_packet_writer" do
-    let(:packet) { double "RTP::Packet" }
+    context "packet writer running" do
+      let(:packet) { double "RTP::Packet" }
 
-    before do
-      Thread.stub(:start).and_yield
-      subject.stub(:loop).and_yield
-      subject.instance_variable_set(:@packets, [packet])
-      RTP::Packet.should_receive(:read).and_return packet
-    end
+      before do
+        Thread.stub(:start).and_yield
+        subject.stub(:loop).and_yield
+        subject.instance_variable_set(:@packets, [packet])
+        RTP::Packet.should_receive(:read).and_return packet
+      end
 
-    after do
-      Thread.unstub(:start)
-    end
+      after do
+        Thread.unstub(:start)
+      end
 
-    context "@strip_headers is false" do
-      before { subject.instance_variable_set(:@strip_headers, false) }
+      context "@strip_headers is false" do
+        before { subject.instance_variable_set(:@strip_headers, false) }
 
-      it "adds the incoming data to @packets Queue" do
-        packet.should_not_receive(:[])
-        subject.instance_variable_get(:@capture_file).should_receive(:write).
-          with packet
-        subject.send(:start_packet_writer)
+        it "adds the incoming data to @packets Queue" do
+          packet.should_not_receive(:rtp_payload)
+          subject.instance_variable_get(:@capture_file).should_receive(:write).
+            with packet
+          subject.send(:start_packet_writer)
+        end
+      end
+
+      context "@strip_headers is true" do
+        before { subject.instance_variable_set(:@strip_headers, true) }
+
+        it "adds the stripped data to @payload_data buffer" do
+          packet.should_receive(:rtp_payload).and_return("payload_data")
+          subject.instance_variable_get(:@capture_file).should_receive(:write).
+            with "payload_data"
+          subject.send(:start_packet_writer)
+        end
       end
     end
 
-    context "@strip_headers is true" do
-      before { subject.instance_variable_set(:@strip_headers, true) }
+    context "packet writer not running" do
+      let(:packet_writer) { double "@packet_writer" }
 
-      it "adds the stripped data to @payload_data buffer" do
-        packet.should_receive(:[]).with("rtp_payload").and_return("payload_data")
-        subject.instance_variable_get(:@capture_file).should_receive(:write).
-          with "payload_data"
-        subject.send(:start_packet_writer)
+      before do
+        subject.instance_variable_set(:@packet_writer, packet_writer)
       end
+
+      specify { subject.send(:start_packet_writer).should == packet_writer }
     end
   end
 
