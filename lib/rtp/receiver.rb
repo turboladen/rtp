@@ -65,6 +65,8 @@ module RTP
         Tempfile.new(DEFAULT_CAPFILE_NAME)
 
       at_exit do
+        stop
+
         unless @capture_file.closed?
           log "Closing and deleting capture capture file..."
           @capture_file.close
@@ -72,6 +74,7 @@ module RTP
         end
       end
 
+      @socket = nil
       @listener = nil
       @packet_writer = nil
       @packets = Queue.new
@@ -98,9 +101,9 @@ module RTP
       @packet_writer = start_packet_writer(&block)
       @packet_writer.abort_on_exception = true
 
-      server = init_socket(@transport_protocol, @rtp_port, @ip_address)
+      @socket = init_socket(@transport_protocol, @rtp_port, @ip_address)
 
-      @listener = start_listener(server)
+      @listener = start_listener(@socket)
       @listener.abort_on_exception = true
 
       running?
@@ -108,7 +111,7 @@ module RTP
 
     # Stops the listener and packet writer threads.
     #
-    # @return [Boolean] true if stopped sucessfully.
+    # @return [Boolean] true if stopped successfully.
     def stop
       return false if !running?
 
@@ -198,6 +201,8 @@ module RTP
     # @return [UDPSocket, TCPServer]
     # @raise [RTP::Error] If +protocol+ was not set to +:UDP+ or +:TCP+.
     def init_socket(protocol, port, ip_address)
+      log "Setting up #{protocol} socket on #{ip_address}:#{port}"
+
       if protocol == :UDP
         socket = UDPSocket.open
         socket.bind(ip_address, port)
@@ -243,6 +248,7 @@ module RTP
     # @return [Boolean] true if it stopped listening.
     def stop_listener
       log "Stopping listener..."
+      @socket.close if @socket
       @listener.kill if listening?
       @listener = nil
       log "Listener stopped."
