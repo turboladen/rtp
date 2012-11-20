@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
   s.require_paths = %w(lib)
 
   s.add_dependency("bindata", "~> 1.4")
-  s.add_dependency("log_switch", ">=0.2.0")
+  s.add_dependency("log_switch", ">=0.4.0")
 
   s.add_development_dependency("bundler", ">= 0")
   s.add_development_dependency("rake", ">= 0")

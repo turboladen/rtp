@@ -5,40 +5,85 @@ http://github.com/turboladen/rtp
 == DESCRIPTION
 
 This is a RTP library that provides the most basic features of the Real-Time
-Transport Protocol (RTP, {RFC 3550}[http://tools.ietf.org/html/rfc3550].  While
+Transport Protocol (RTP, {RFC 3550}[http://tools.ietf.org/html/rfc3550]).  While
 the protocol allows for extensions that define new ways for transporting encoded
 audio/video, this library doesn't yet deal with any specific media types.  My
 current goal is simply for transporting a single RTP stream of data and allowing
-you to decode its fixed headers.  Quite frankly, this first release is just a
-break out of the Receiver stuff that was built in to the
-{rtsp library}[https://github.com/turboladen/rtsp], with the ability to parse
-RTP header data.
-
-Future goals will include:
-
-* Implement "sink"--sort RTP packets
-* Implementing RTCP
-* Multiplexed sessions
-* Decoding of basic audio/video codec headers
-* Decoding of some popular A/V extension headers (h.264, et al.)
-* An easy way to hand over your data to an app that will decode your A/V stream(s)
+you to inspect its packets.
 
 == FEATURES/PROBLEMS
 
 Features:
 
-* Receive a single RTP stream over UDP
+* Receive a single RTP stream over UDP or TCP, unicast or multicast
 * Parse RTP packet headers
+* Inspect packets on the fly
+
+Future goals will include:
+
+* RTCP
+* Multiplexed sessions
+* Decoding of basic audio/video codec headers
+* Decoding of some popular A/V extension headers (h.264, et al.)
+* An easy way to hand over your data to an app that will decode your A/V stream(s)
+* Sending an RTP stream
 
 == SYNOPSIS
 
-FIX (explain how to use, etc)
+=== Streaming to file
+
+With its default settings, an {RTP::Receiver} will open a UDP socket on port 6790,
+within a Thread, on 0.0.0.0 and capture the data it receives to a file.
+
+  receiver = RTP::Receiver.new      # Uses a Tempfile by default
+  receiver.rtp_port                 # => 6790
+  receiver.transport_protocol       # => :UDP
+  receiver.multicast?               # => false
+  receiver.unicast?                 # => true
+  receiver.start
+  sleep 5
+  receiver.stop
+  receiver.capture_file.size        # => 20040
+
+To init a Receiver with some other options...
+
+  options = {
+    rtp_port: 9000,
+    transport_protocol: :TCP,
+    ip_address: '239.255.255.251',  # Multicast!
+    strip_headers: true,            # Strips RTP headers before writing to file
+    capture_file: File.new('data.rtp', 'wb')
+  }
+  receiver = RTP::Receiver.new(options)
+  receiver.start
+  sleep 5
+  receiver.stop
+  receiver.capture_file.size        # => 18848
+
+=== Packet inspecting
+
+To inspect (and do what you like with) packets as they come in...
+
+  receiver = RTP::Receiver.new
+  receiver.start do |packet|
+    puts "Sequence number: #{packet.sequence_number}"  # => Sequence number: 2931830
+  end
+  sleep 5
+  receiver.stop
+  receiver.capture_file.size        # => 0
+
+Notice how no data was written to file when the block was passed to +#start+.  The
+idea there is to save on I/O; if you're inspecting packets, it's not fair to
+assume you want to save the data to a file.  If you do, however, in that case,
+you can simply do so within the block.
 
 == REQUIREMENTS
 
 * (Tested) Rubies
   * 1.9.2
   * 1.9.3
+  * JRuby 1.9 mode
+  * Rubinius 1.9 mode
 * RubyGems:
   * bindata
   * log_switch

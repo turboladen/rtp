@@ -17,3 +17,6 @@ rtp*.gem
 
 # RubyMine
 .idea/
+
+# Rubinius
+.rbx/
