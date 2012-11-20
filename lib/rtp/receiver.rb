@@ -65,8 +65,6 @@ module RTP
         Tempfile.new(DEFAULT_CAPFILE_NAME)
 
       at_exit do
-        stop
-
         unless @capture_file.closed?
           log "Closing and deleting capture capture file..."
           @capture_file.close
