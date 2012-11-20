@@ -66,7 +66,7 @@ module RTP
 
       at_exit do
         unless @capture_file.closed?
-          puts "Closing and deleting capture capture file..."
+          log "Closing and deleting capture capture file..."
           @capture_file.close
           @capture_file.unlink
         end
