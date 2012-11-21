@@ -1,11 +1,18 @@
-=== 0.1.0 / 2012-11-14
+=== 0.1.1 / 2012-11-20
+
+==== Bug Fixes:
+
+* RTP::Receiver#init_socket now uses #recv instead of #recvmsg for JRuby compat.
+
+=== 0.1.0 / 2012-11-20
 
 Lots of big changes this release!  Only a minor bump though, since I'm assuming
 that I'm about the only one using this at this point and I'm not going to mess
 anyone else up by making these changes.  This is how the initial release should
 have been.
 
-New features:
+==== New features:
+
 * RTP::Receiver#start (used to be #run--see below) now takes an optional block
   that will yield a parsed RTP::Packet.  This allows for inspecting packets
   as they come in.  If a block is given, no data will be written to the capture
@@ -18,7 +25,8 @@ New features:
   functionality behind the #rtcp_port yet; just a numerical placeholder, really.
 * Use Kernel#at_exit to make sure capture files get closed and deleted.
 
-Refactorings:
+==== Refactorings:
+
 * RTP::Receiver.new now takes an options Hash instead of a bunch of params.
 * Merged RTP::Receiver#run and RTP::Receiver#start_listener into
   RTP::Receiver#start.  There wasn't any benefit of having them separate.

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rtp (0.1.0)
+    rtp (0.1.1)
       bindata (~> 1.4)
       log_switch (>= 0.4.0)
 
@@ -40,7 +40,7 @@ PLATFORMS
 DEPENDENCIES
   bundler
   rake
-  rspec (~> 2.7)
+  rspec (~> 2)
   rtp!
   simplecov
   tailor (>= 1.1.2)
