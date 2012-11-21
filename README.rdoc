@@ -84,8 +84,6 @@ you can simply do so within the block.
 * (Tested) Rubies
   * 1.9.2
   * 1.9.3
-  * JRuby 1.9 mode
-  * Rubinius 1.9 mode
 * RubyGems:
   * bindata
   * log_switch
