@@ -293,7 +293,7 @@ describe RTP::Receiver do
     end
 
     let(:socket) do
-      double "Socket", recvmsg: message
+      double "Socket", recv: message
     end
 
     it "starts a new Thread and returns that" do
@@ -305,7 +305,7 @@ describe RTP::Receiver do
       Thread.stub(:start).and_yield
       subject.stub(:loop).and_yield
 
-      socket.should_receive(:recvmsg).with(1500).and_return message
+      socket.should_receive(:recv).with(1500).and_return message
 
       subject.send(:start_listener, socket)
 

@@ -230,7 +230,7 @@ module RTP
 
       Thread.start(socket) do
         loop do
-          msg = socket.recvmsg(MAX_BYTES_TO_RECEIVE)
+          msg = socket.recv(MAX_BYTES_TO_RECEIVE)
           data = msg.first
           log "Received data at size: #{data.size}"
 
