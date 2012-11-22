@@ -1,3 +1,10 @@
+=== 0.1.3 / 2012-11-21
+
+==== Improvements:
+
+* RTP::Receiver#start now also yields the timestamp from the packet as received
+  on the socket.
+
 === 0.1.2 / 2012-11-20
 
 ==== Bug Fixes:
