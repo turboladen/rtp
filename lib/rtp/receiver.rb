@@ -83,13 +83,22 @@ module RTP
     #
     # If a block is given, this will yield each parsed packet as an RTP::Packet.
     # This lets you inspect packets as they come in:
-    # @example
+    # @example Just the packet
     #   receiver = RTP::Receiver.new
     #   receiver.start do |packet|
-    #     puts packet["sequence_number"]
+    #     puts packet.sequence_number
+    #   end
+    #
+    # @example The packet and its timestamp
+    #   receiver = RTP::Receiver.new
+    #   receiver.start do |packet, timestamp|
+    #     puts packet.sequence_number
+    #     puts timestamp
     #   end
     #
     # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
+    # @yield [Time] The timestamp from the packet as it was received on the
+    #   socket.
     #
     # @return [Boolean] true if started successfully.
     def start(&block)
@@ -167,10 +176,13 @@ module RTP
     # This starts a new Thread for reading packets off of the list of packets
     # that has been read in by the listener.  If no block is given, this writes
     # all received packets (in the @packets Queue) to the +capture_file+.  If a
-    # block is given, it yields each packet, parsed as an RTP::Packet.  If
+    # block is given, it yields each packet, parsed as an RTP::Packet as well as
+    # the timestamp from that packet as it was received on the socket.  If
     # +strip_headers+ is set, it only writes/yields the RTP payload to the file.
     #
     # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
+    # @yield [Time] The timestamp from the packet as it was received on the
+    #   socket.
     # @return [Thread] The packet writer thread.
     def start_packet_writer
       return @packet_writer if @packet_writer
@@ -179,13 +191,16 @@ module RTP
       # some I/O ano not write the packet to file?
       Thread.start do
         loop do
-          packet = RTP::Packet.read(@packets.pop)
+          msg, timestamp = @packets.pop
+          packet = RTP::Packet.read(msg)
+
           data_to_write = @strip_headers ? packet.rtp_payload : packet
 
           if block_given?
-            yield data_to_write
+            yield data_to_write, timestamp
           else
             @capture_file.write(data_to_write)
+            @packet_timestamps << timestamp
           end
         end
       end
@@ -235,8 +250,7 @@ module RTP
           log "Received data at size: #{data.size}"
 
           log "RTP timestamp from socket info: #{msg.last.timestamp}"
-          @packet_timestamps << msg.last.timestamp
-          @packets << data
+          @packets << [data, msg.last.timestamp]
         end
       end
     end
