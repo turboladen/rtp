@@ -1,3 +1,68 @@
+=== 0.1.3 / 2012-11-21
+
+==== Improvements:
+
+* RTP::Receiver#start now also yields the timestamp from the packet as received
+  on the socket.
+
+=== 0.1.2 / 2012-11-20
+
+==== Bug Fixes:
+
+* Undid changes from 0.1.1 and removed claims for JRuby and Rubinius support.
+  The changes from 0.1.1 were incomplete for actually supporting those rubies
+  and I don't want to spend the time right now learning how to fix that correctly.
+
+=== 0.1.1 / 2012-11-20
+
+==== Bug Fixes:
+
+* RTP::Receiver#init_socket now uses #recv instead of #recvmsg for JRuby compat.
+
+=== 0.1.0 / 2012-11-20
+
+Lots of big changes this release!  Only a minor bump though, since I'm assuming
+that I'm about the only one using this at this point and I'm not going to mess
+anyone else up by making these changes.  This is how the initial release should
+have been.
+
+==== New features:
+
+* RTP::Receiver#start (used to be #run--see below) now takes an optional block
+  that will yield a parsed RTP::Packet.  This allows for inspecting packets
+  as they come in.  If a block is given, no data will be written to the capture
+  file, so as to conserve I/O.
+* Added ability to receive on multicast sockets.  To do so, just set the
+  :ip_address option on init to the multicast address you want to use.
+* Turned logging off by default.  To turn on, just do <tt>RTP::Logger = true</tt>.
+* Updated RTP::Logger to use log_switch 0.4.0's log_class_name feature.
+* Setting RTP::Receiver#rtp_port will now set #rtcp_port.  There's no
+  functionality behind the #rtcp_port yet; just a numerical placeholder, really.
+* Use Kernel#at_exit to make sure capture files get closed and deleted.
+
+==== Refactorings:
+
+* RTP::Receiver.new now takes an options Hash instead of a bunch of params.
+* Merged RTP::Receiver#run and RTP::Receiver#start_listener into
+  RTP::Receiver#start.  There wasn't any benefit of having them separate.
+* Removed all packet sorting provisions--pretty sure this shouldn't happen at
+  this level.  This means RTP::Receiver#write_buffer_to_file is gone.
+* Added a @packets Queue, dedicated to writing packets out to the capture file.
+  Besides getting out of the way of the receiving I/O, this also abstracts away
+  the writing to file logic from the receiving and parsing logic.  In a related
+  manner...
+* #strip_headers is an RTP::Receiver accessor now, so you can set
+  this to true if you only want to capture/yield the RTP payload.
+* RTP::Receiver#init_server is now RTP::Receiver#init_socket.
+* Removed port retrying for RTP::Receiver; if the port requested for use by the
+  Receiver is in use, I don't think it should be the role of the Receiver to try
+  to keep trying--you asked for port X--if it's not available, you should be
+  told so.  Thus, users of Receivers should now implement this if they so desire.
+* RTP::Receiver users are no longer required to tell the object what type of
+  IP addressing to use--this is now inferred from the IP address given to use.
+  Default is set to 0.0.0.0; if an address in the range 224.0.0.0 -
+  239.255.255.255 is given, multicasat settings are assumed.
+
 === 0.0.1 / 2012-03-02
 
 * Initial release.

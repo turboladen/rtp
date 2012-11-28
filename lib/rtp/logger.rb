@@ -5,3 +5,7 @@ module RTP
     extend LogSwitch
   end
 end
+
+RTP::Logger.log_class_name = true
+RTP::Logger.log = false
+
