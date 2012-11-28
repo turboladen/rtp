@@ -18,13 +18,15 @@ Gem::Specification.new do |s|
   s.test_files = Dir.glob("spec/**/*")
   s.require_paths = %w(lib)
 
-  s.add_dependency("bindata", "~> 1.4")
-  s.add_dependency("log_switch", ">=0.2.0")
+  s.add_dependency "bindata", "~> 1.4"
+  s.add_dependency "log_switch", ">=0.2.0"
+  s.add_dependency "os", ">=0.9.6"
+  s.add_dependency("sys-proctable", "~> 0.9.2") unless RUBY_PLATFORM == "java"
 
-  s.add_development_dependency("bundler", ">= 0")
-  s.add_development_dependency("rake", ">= 0")
-  s.add_development_dependency("rspec", "~> 2.7")
-  s.add_development_dependency("simplecov", ">= 0")
-  s.add_development_dependency("tailor", ">= 1.1.2")
-  s.add_development_dependency("yard", ">= 0.7.2")
+  s.add_development_dependency "bundler"
+  s.add_development_dependency "rake"
+  s.add_development_dependency "rspec", "~> 2.7"
+  s.add_development_dependency "simplecov"
+  s.add_development_dependency "tailor", ">= 1.1.2"
+  s.add_development_dependency "yard", ">= 0.7.2"
 end
