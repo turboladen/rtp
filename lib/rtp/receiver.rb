@@ -184,7 +184,7 @@ module RTP
     # @yield [Time] The timestamp from the packet as it was received on the
     #   socket.
     # @return [Thread] The packet writer thread.
-    def start_packet_writer
+    def start_packet_writer(&block)
       return @packet_writer if @packet_writer
 
       # If a block is given for packet inspection, perhaps we should save
@@ -196,7 +196,7 @@ module RTP
 
           data_to_write = @strip_headers ? packet.rtp_payload : packet
 
-          if block_given?
+          if block
             yield data_to_write, timestamp
           else
             @capture_file.write(data_to_write)

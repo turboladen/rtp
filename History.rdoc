@@ -1,3 +1,10 @@
+=== 0.1.4 / 2012-12-06
+
+=== Bug Fixes:
+
+* gh-5: If Receiver#start wasn't given a block, it wouldn't write to the capture
+  file.
+
 === 0.1.3 / 2012-11-21
 
 ==== Improvements:
