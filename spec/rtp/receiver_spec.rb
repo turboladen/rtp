@@ -318,7 +318,7 @@ describe RTP::Receiver do
     let(:data) { double "socket data", size: 10 }
     let(:socket_info) { double "socket info", timestamp: '12345' }
     let(:message) { [data, socket_info] }
-    let(:socket) { double "Socket", recvmsg: message }
+    let(:socket) { double "Socket", recvmsg_nonblock: message }
 
     it "starts a new Thread and returns that" do
       Thread.should_receive(:start).with(socket).and_return listener
@@ -329,7 +329,7 @@ describe RTP::Receiver do
       Thread.stub(:start).and_yield
       subject.stub(:loop).and_yield
 
-      socket.should_receive(:recvmsg).with(1500).and_return message
+      socket.should_receive(:recvmsg_nonblock).with(1500).and_return message
 
       subject.send(:start_listener, socket)
 
@@ -376,8 +376,10 @@ describe RTP::Receiver do
 
   describe "#stop_packet_writer" do
     let(:packet_writer) { double "@packet_writer" }
+    before { subject.instance_variable_set(:@packet_writer, packet_writer) }
 
     it "closes the @capture_file" do
+      subject.stub(:writing_packets?)
       subject.instance_variable_get(:@capture_file).should_receive(:close)
       subject.send(:stop_packet_writer)
     end
