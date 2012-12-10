@@ -150,16 +150,21 @@ describe RTP::Receiver do
   describe "#start_packet_writer" do
     context "packet writer running" do
       let(:packet) { double "RTP::Packet" }
+      let(:msg) { "the data" }
+      let(:timestamp) { "12345" }
 
-      before do
-        Thread.stub(:start).and_yield
-        subject.stub(:loop).and_yield
-        subject.instance_variable_set(:@packets, [packet])
-        RTP::Packet.should_receive(:read).and_return packet
+      let(:packets) do
+        p = double("Queue")
+        p.should_receive(:pop).and_return [msg, timestamp]
+
+        p
       end
 
-      after do
-        Thread.unstub(:start)
+      before do
+        Thread.should_receive(:start).and_yield
+        subject.should_receive(:loop).and_yield
+        RTP::Packet.should_receive(:read).with(msg).and_return packet
+        subject.instance_variable_set(:@packets, packets)
       end
 
       context "@strip_headers is false" do
@@ -183,6 +188,40 @@ describe RTP::Receiver do
           subject.send(:start_packet_writer)
         end
       end
+
+      context "block is given" do
+        it "yields the data and its timestamp" do
+          expect { |block|
+            subject.send(:start_packet_writer, &block)
+          }.to yield_with_args packet, timestamp
+        end
+      end
+
+      context "no block given" do
+        let(:capture_file) do
+          c = double "@capture_file"
+          c.stub(:closed?)
+
+          c
+        end
+
+        before { RTP::Receiver.any_instance.instance_variable_set(:@capture_file, capture_file) }
+
+        it "writes to the capture file" do
+          subject.instance_variable_get(:@capture_file).should_receive(:write).
+            with(packet)
+
+          subject.send(:start_packet_writer)
+        end
+
+        it "adds timestamps to @timestamps" do
+          subject.instance_variable_get(:@capture_file).stub(:write)
+          subject.instance_variable_get(:@packet_timestamps).
+            should_receive(:<<).with(timestamp)
+
+          subject.send(:start_packet_writer)
+        end
+      end
     end
 
     context "packet writer not running" do
@@ -194,6 +233,7 @@ describe RTP::Receiver do
 
       specify { subject.send(:start_packet_writer).should == packet_writer }
     end
+
   end
 
   describe "#init_socket" do
@@ -275,26 +315,10 @@ describe RTP::Receiver do
       l
     end
 
-    let(:data) do
-      d = double "data"
-      d.stub(:size)
-
-      d
-    end
-
-    let(:timestamp) { double "timestamp" }
-
-    let(:message) do
-      m = double "msg"
-      m.stub(:first).and_return data
-      m.stub_chain(:last, :timestamp).and_return timestamp
-
-      m
-    end
-
-    let(:socket) do
-      double "Socket", recvmsg: message
-    end
+    let(:data) { double "socket data", size: 10 }
+    let(:socket_info) { double "socket info", timestamp: '12345' }
+    let(:message) { [data, socket_info] }
+    let(:socket) { double "Socket", recvmsg_nonblock: message }
 
     it "starts a new Thread and returns that" do
       Thread.should_receive(:start).with(socket).and_return listener
@@ -305,15 +329,20 @@ describe RTP::Receiver do
       Thread.stub(:start).and_yield
       subject.stub(:loop).and_yield
 
-      socket.should_receive(:recvmsg).with(1500).and_return message
+      socket.should_receive(:recvmsg_nonblock).with(1500).and_return message
 
       subject.send(:start_listener, socket)
 
       Thread.unstub(:start)
     end
 
-    it "extracts the timestamp of the received data and adds it to @packet_timestamps" do
-      pending
+    it "adds the socket data and timestamp to @packets" do
+      Thread.stub(:start).and_yield
+      subject.stub(:loop).and_yield
+
+      subject.instance_variable_get(:@packets).should_receive(:<<).
+        with [data, '12345']
+      subject.send(:start_listener, socket)
     end
   end
 
@@ -346,6 +375,39 @@ describe RTP::Receiver do
   end
 
   describe "#stop_packet_writer" do
-    pending
+    let(:packet_writer) { double "@packet_writer" }
+    before { subject.instance_variable_set(:@packet_writer, packet_writer) }
+
+    it "closes the @capture_file" do
+      subject.stub(:writing_packets?)
+      subject.instance_variable_get(:@capture_file).should_receive(:close)
+      subject.send(:stop_packet_writer)
+    end
+
+    context "writing packets" do
+      before do
+        subject.should_receive(:writing_packets?).and_return true
+        subject.should_receive(:writing_packets?).and_return false
+      end
+
+      it "kills the @packet_writer and sets it to nil" do
+        subject.instance_variable_get(:@packet_writer).should_receive(:kill)
+        subject.send(:stop_packet_writer)
+        subject.instance_variable_get(:@packet_writer).should be_nil
+      end
+    end
+
+    context "not writing packets" do
+      before do
+        subject.should_receive(:writing_packets?).and_return false
+        subject.should_receive(:writing_packets?).and_return false
+      end
+
+      it "sets @packet_writer it to nil" do
+        subject.instance_variable_get(:@packet_writer).should_not_receive(:kill)
+        subject.send(:stop_packet_writer)
+        subject.instance_variable_get(:@packet_writer).should be_nil
+      end
+    end
   end
 end
