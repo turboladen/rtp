@@ -111,9 +111,9 @@ module RTP
 
           hash[member] = case value.class.name
           when 'RTP::FFmpeg::AVRational'
-            value[:den].zero? ? value[:num] : value.to_float
+            value[:den].zero? ? value[:num] : value.to_f
           when 'RTP::FFmpeg::AVFrac'
-            value[:den].zero? ? value[:val] : value.to_float
+            value[:den].zero? ? value[:val] : value.to_f
           else
             value
           end
