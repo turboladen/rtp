@@ -95,22 +95,12 @@ module RTP
     private
 
     def initialize_streams(p={})
-      log "Streams: #{@av_format_ctx[:nb_streams]}"
-      log "video codec id: #{@av_format_ctx[:video_codec_id]}"
-      log "video start time: #{@av_format_ctx[:start_time]}"
-      log "video packet size: #{@av_format_ctx[:packet_size]}"
-
       @av_format_ctx[:nb_streams].times do |i|
         av_stream = AVStream.new(@av_format_ctx[:streams][i].get_pointer(0))
         #av_stream.members.each_with_index do |member, i|
         #  log "#{member}: #{av_stream.values.at(i)}"
         #end
-        log "Stream index: #{av_stream[:index]}"
-        log "Stream id: #{av_stream[:id]}"
-        log "Stream codec: #{av_stream.codec}"
-        log "Stream codec codec type: #{av_stream.codec[:codec_type]}"
-        log "Stream codec type: #{av_stream.codec_type}"
-        log "Stream codec bit rate: #{av_stream.bit_rate}"
+        pp av_stream.to_hash
 
         #@streams << case av_codec_ctx[:codec_type]
         @streams << case av_stream.codec_type
