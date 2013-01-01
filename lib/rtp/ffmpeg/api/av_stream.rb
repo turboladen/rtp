@@ -101,6 +101,25 @@ module RTP
             [ object_id, self[:index], self[:id], codec[:codec_type] ]
       end
 
+      def to_hash
+        hash = {}
+
+        members.each_with_index do |member, i|
+          value = values.at(i)
+
+          hash[member] = case value.class.name
+          when 'RTP::FFmpeg::AVRational'
+            value[:den].zero? ? value[:num] : value.to_float
+          when 'RTP::FFmpeg::AVFrac'
+            value[:den].zero? ? value[:val] : value.to_float
+          else
+            value
+          end
+        end
+
+        hash
+      end
+
       def discard=(type)
         send(:[]=, :discard, type)
       end
