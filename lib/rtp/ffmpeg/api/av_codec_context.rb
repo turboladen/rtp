@@ -178,7 +178,7 @@ module RTP
               :reordered_opaque, :int64,
               :hwaccel, :pointer,
               :hwaccel_context, :pointer,
-              :error, [:uint64, MAX_NUM_DATA_POINTERS],
+              :error, [:uint64, AV_NUM_DATA_POINTERS],
               :dct_algo, :int,
               :idct_algo, :int,
               :bits_per_coded_sample, :int,

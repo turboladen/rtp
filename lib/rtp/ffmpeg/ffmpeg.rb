@@ -239,7 +239,7 @@ module RTP
     AVSEEK_FLAG_ANY      = 4
     AV_TIME_BASE         = 1000000
     AV_PARSER_PTS_NB     = 4
-    MAX_NUM_DATA_POINTERS = old_api? ? 4 : 8
+    AV_NUM_DATA_POINTERS = old_api? ? 4 : 8
 
 
     ###################################################
