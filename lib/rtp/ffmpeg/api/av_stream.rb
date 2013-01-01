@@ -84,7 +84,9 @@ module RTP
 
       def codec
         #AVCodecContext.new.send(:[], :codec)
-        @codec ||= AVCodecContext.new(self[:codec])
+        if self[:codec]
+          @codec ||= AVCodecContext.new(self[:codec])
+        end
       end
 
       def bit_rate
