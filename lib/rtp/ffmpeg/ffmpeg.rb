@@ -1,11 +1,9 @@
 require 'ffi'
-require 'dl'
-require_relative '../helpers'
+
 
 module RTP
   module FFmpeg
     extend FFI::Library
-    include RTP::Helpers
 
     def self.old_api
       @old_api ||= false
@@ -23,38 +21,12 @@ module RTP
         :avutil   => ENV['FFI_FFMPEG_LIBAVUTIL'],
         :avformat => ENV['FFI_FFMPEG_LIBAVFORMAT'],
         :avcodec  => ENV['FFI_FFMPEG_LIBAVCODEC'],
-        #:swscale  => ENV['FFI_FFMPEG_LIBSWSCALE']
     }
 
-    #if linux?
-    #  LIBRARY_FILENAME[:avutil]   ||= "libavutil.so.49"
-    #  LIBRARY_FILENAME[:avformat] ||= "libavformat.so.52"
-    #  LIBRARY_FILENAME[:avcodec]  ||= "libavcodec.so.52"
-    #  LIBRARY_FILENAME[:swscale]  ||= "libswscale.so.0"
-    #elsif mac?
-      LIBRARY_FILENAME[:avutil]   ||= "libavutil"
-      LIBRARY_FILENAME[:avformat] ||= "libavformat"
-      LIBRARY_FILENAME[:avcodec]  ||= "libavcodec"
-    #LIBRARY_FILENAME[:swscale]  ||= "libswscale"
+    LIBRARY_FILENAME[:avutil]   ||= "libavutil"
+    LIBRARY_FILENAME[:avformat] ||= "libavformat"
+    LIBRARY_FILENAME[:avcodec]  ||= "libavcodec"
 
-    #if mac?
-      # Ok, this is stupid, but macports increments the major revision
-      # number from 0 to 1 to make some of their code work.  We check
-      # for this case here and try libswscale.0 failing back to
-      # libswscale.1.
-      #
-      # See this commit for details:
-      #   https://svn.macports.org/changeset/43550
-      #LIBRARY_FILENAME[:swscale]  ||= begin
-      #  DL.dlopen("libswscale.0.dylib").close
-      #  "libswscale.0"
-      #rescue DL::DLError
-      #  "libswscale.1"
-      #end
-    #end
-    #elsif win?
-    #  warn "Not sure what libs to load under windows yet..."
-    #end
 
     # Not actually an enum in libavutil.h, but we make it one here to
     # make the api prettier.
@@ -67,19 +39,6 @@ module RTP
                         :verbose, 40,
                         :debug,   48
 
-=begin
-    SWScaleFlags = enum :fast_bilinear, 0x001,
-                        :bilinear,      0x002,
-                        :bicubic,       0x004,
-                        :x,             0x008,
-                        :point,         0x010,
-                        :area,          0x020,
-                        :bicublin,      0x040,
-                        :gauss,         0x080,
-                        :sinc,          0x100,
-                        :lanczos,       0x200,
-                        :spline,        0x400
-=end
 
     ###################################################
     #                                                 #
@@ -139,6 +98,12 @@ module RTP
     attach_function :av_read_frame, [:pointer, :pointer], :int
     attach_function :av_seek_frame, [:pointer, :int, :long_long, :int], :int
     attach_function :av_find_default_stream_index, [ :pointer ], :int
+    attach_function :avformat_close_input, [:pointer], :void
+
+    attach_function :av_image_alloc,
+      [:pointer, :pointer, :int, :int, :int, :int], :int
+    attach_function :av_image_copy,
+      [:pointer, :pointer, :pointer, :pointer, :int, :int, :int], :void
 
     if old_api?
       # This function is inlined in avformat, defining it here
@@ -172,6 +137,7 @@ module RTP
     ffi_lib LIBRARY_FILENAME[:avcodec]
     attach_function :avcodec_find_decoder, [:int], :pointer
     attach_function :avcodec_open, [:pointer, :pointer], :int
+    attach_function :avcodec_open2, [:pointer, :pointer, :pointer], :int
     attach_function :avcodec_alloc_frame, [], :pointer
 
     if old_api?
@@ -196,33 +162,14 @@ module RTP
     attach_function :avcodec_default_get_buffer, [:pointer, :pointer], :int
     attach_function :avcodec_default_release_buffer, [:pointer, :pointer], :int
 
-    #--------------------------------------------------
-    # libswscale
-    #--------------------------------------------------
-=begin
-    ffi_lib LIBRARY_FILENAME[:swscale]
-    if old_api?
-      attach_function :sws_getContext,
-                      [:int, :int, PixelFormat, :int, :int, PixelFormat,
-                       SWScaleFlags, :pointer, :pointer, :pointer],
-                      :pointer
-    else
-      attach_function :sws_getContext,
-                      [:int, :int, AVPixelFormat, :int, :int, AVPixelFormat,
-                       SWScaleFlags, :pointer, :pointer, :pointer],
-                      :pointer
-    end
-    attach_function :sws_freeContext,
-                    [:pointer],
-                    :void
-    attach_function :sws_scale,
-                    [:pointer, :pointer, :pointer, :int,
-                     :int, :pointer, :pointer],
-                    :int,
-                    { :blocking => true }
 
-    callback :av_codec_context_get_buffer, [:pointer, :pointer], :int
-=end
+
+    attach_function :av_init_packet, [:pointer], :void
+
+    ffi_lib FFI::Library::LIBC
+    attach_function :fopen, [:pointer, :pointer], :pointer
+    attach_function :fwrite, [:pointer, :uint, :uint, :pointer], :uint
+    attach_function :fclose, [:pointer], :int
 
     ###################################################
     #                                                 #
@@ -241,6 +188,9 @@ module RTP
     AV_PARSER_PTS_NB     = 4
     AV_NUM_DATA_POINTERS = old_api? ? 4 : 8
 
+
+    INBUF_SIZE = 4096
+    FF_INPUT_BUFFER_PADDING_SIZE = 8
 
     ###################################################
     #                                                 #
@@ -263,6 +213,7 @@ module RTP
       require_relative 'api/av_packet'
       require_relative 'api/av_stream'
       require_relative 'api/av_codec_context'
+      require_relative 'api/av_codec'
       require_relative 'api/av_format_context'
       require_relative 'api/av_frame'
     end
