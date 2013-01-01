@@ -1,3 +1,5 @@
+# Media files found in support/ came from
+# http://support.apple.com/kb/HT1425?viewlocale=en_US&locale=en_US
 require 'simplecov'
 
 SimpleCov.start do
