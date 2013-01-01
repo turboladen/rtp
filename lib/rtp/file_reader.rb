@@ -17,20 +17,39 @@ module RTP
       @streams = []
 
       FFmpeg.av_register_all
+      FFmpeg.av_log_set_level(:debug)
+
+      open_file(filename)
+      get_stream_info
+
+      # Set up finalizer to free up resources
+      ObjectSpace.define_finalizer(self, self.class.method(:finalize).to_proc)
+      initialize_streams(p)
+    end
+
+    def get_stream_info
+      @av_format_ctx = AVFormatContext.new(@av_format_ctx.get_pointer(0))
+      return_code = av_find_stream_info(@av_format_ctx)
+
+      if return_code < 0
+        raise RuntimeError, "av_find_stream_info() failed, rc=#{return_code}"
+      end
+
+      log "Stream count: #{av_format_ctx[:nb_streams]}"
+      log "File duration: #{av_format_ctx[:duration]}"
+      log "File start time: #{av_format_ctx[:start_time]}"
+      log "File packet size: #{av_format_ctx[:packet_size]}"
+    end
+
+    def open_file(filename)
       @av_format_ctx = FFI::MemoryPointer.new(:pointer)
       #rc = av_open_input_file(@av_format_ctx, @filename, nil, 0, nil)
       return_code = FFmpeg.avformat_open_input(@av_format_ctx, @filename, nil, 0, nil)
 
       unless return_code.zero?
         raise RuntimeError, "av_open_input_file() failed, filename='%s', rc=%d" %
-            [filename, return_code]
+          [filename, return_code]
       end
-
-      @av_format_ctx = AVFormatContext.new(@av_format_ctx.get_pointer(0))
-      return_code = av_find_stream_info(@av_format_ctx)
-      raise RuntimeError, "av_find_stream_info() failed, rc=#{return_code}" if return_code < 0
-
-      initialize_streams(p)
     end
 
     def dump_format
