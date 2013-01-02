@@ -93,8 +93,6 @@ module RTP
 
           break if rc == false
         end
-
-        av_free(av_packet)
       end
 
       end
