@@ -3,7 +3,7 @@ require './lib/rtp/libc'
 require './lib/rtp/ffmpeg/raw_video_file'
 
 
-RTP::Logger.log = true
+#RTP::Logger.log = true
 reader = RTP::FileReader.new(ARGV.first)
 reader.dump_format
 
@@ -13,15 +13,14 @@ pp video_stream
 
 =begin
 video_dst_file = RTP::FFmpeg::RawVideoFile.new('raw_video',
-  video_stream.av_codec_ctx[:width],
-  video_stream.av_codec_ctx[:height])
+  video_stream.width,
+  video_stream.height)
 
 video_stream.each_frame do |frame|
   puts "frame pict type: #{frame.av_frame[:pict_type]}"
   puts "frame format: #{frame.av_frame[:format]}"
   puts "frame width: #{frame.av_frame[:width]}"
   puts "frame height: #{frame.av_frame[:height]}"
-  puts "frame number of audio samples: #{frame.av_frame[:nb_samples]}"
   puts "frame presentation time stamp: #{frame.av_frame[:pts]}"
   puts "frame coded picture number: #{frame.av_frame[:coded_picture_number]}"
   puts "frame display picture number: #{frame.av_frame[:display_picture_number]}"
@@ -34,13 +33,10 @@ end
 
 video_dst_file.close
 
-pix_fmt = video_stream.av_codec_ctx[:pix_fmt]
-width = video_stream.av_codec_ctx[:width]
-height = video_stream.av_codec_ctx[:height]
 cmd = "ffplay -f rawvideo "
-cmd << "-pixel_format #{pix_fmt} "
-cmd << "-video_size #{width}x#{height} "
-cmd << "-t #{reader.av_format_context[:duration]} "
+cmd << "-pixel_format #{video_stream.pixel_format} "
+cmd << "-video_size #{video_stream.width}x#{video_stream.height} "
+cmd << "-t #{reader.duration} "
 cmd << "-loglevel debug "
 cmd << "raw_video"
 puts "Play the output video file with the command:\n#{cmd}"
@@ -64,7 +60,7 @@ end
 RTP::LibC.fclose(video_dst_file)
 
 cmd = "ffplay -f m4v "
-cmd << "-t #{reader.av_format_context[:duration]} "
+cmd << "-t #{reader.duration} "
 cmd << "-loglevel debug "
 cmd << "raw_h264_video"
 puts "Play the output video file with the command:\n#{cmd}"
