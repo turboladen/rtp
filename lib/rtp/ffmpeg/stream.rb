@@ -95,6 +95,26 @@ module RTP
         end
       end
 
+      # Use for demuxing the stream without decoding it.  It yields each packet
+      # as it is read.  The only difference between this and #each_frame is that
+      # #each_frame decodes each packet and yields frames held in the packet.
+      def each_packet(&block)
+        raise ArgumentError, "No block provided" unless block_given?
+
+        av_packet = AVPacket.new
+        av_init_packet(av_packet)
+        av_packet[:data] = nil
+        av_packet[:size] = 0
+
+        while av_read_frame(@reader.av_format_ctx, av_packet) >= 0
+          log "Packet from stream number #{av_packet[:stream_index]}"
+
+          if av_packet[:stream_index] == index
+            yield(av_packet)
+          end
+
+          av_free_packet(av_packet)
+        end
       end
     end
   end

@@ -11,6 +11,7 @@ video_stream = reader.streams.find { |stream| stream.type == :video }
 abort "No video stream found" unless video_stream
 pp video_stream
 
+=begin
 video_dst_file = RTP::FFmpeg::RawVideoFile.new('raw_video',
   video_stream.av_codec_ctx[:width],
   video_stream.av_codec_ctx[:height])
@@ -31,6 +32,8 @@ video_stream.each_frame do |frame|
   video_dst_file.write(frame.av_frame[:data][0])
 end
 
+video_dst_file.close
+
 pix_fmt = video_stream.av_codec_ctx[:pix_fmt]
 width = video_stream.av_codec_ctx[:width]
 height = video_stream.av_codec_ctx[:height]
@@ -38,10 +41,37 @@ cmd = "ffplay -f rawvideo "
 cmd << "-pixel_format #{pix_fmt} "
 cmd << "-video_size #{width}x#{height} "
 cmd << "-t #{reader.av_format_ctx[:duration]} "
-cmd << "-b #{reader.av_format_ctx[:bit_rate]} "
 cmd << "-loglevel debug "
 cmd << "raw_video"
 puts "Play the output video file with the command:\n#{cmd}"
 `#{cmd}`
 
-video_dst_file.close
+=end
+
+video_dst_file = RTP::LibC.fopen('raw_mpeg4_video', 'wb')
+
+video_stream.each_packet do |packet|
+  puts "Packet pts: #{packet[:pts]}"
+  puts "Packet dts: #{packet[:dts]}"
+  puts "Packet duration: #{packet[:duration]}"
+  puts "Packet pos: #{packet[:pos]}"
+
+  unless packet[:data].null?
+    RTP::LibC.fwrite(
+      packet[:data],
+      packet[:size],
+      1,
+      video_dst_file
+    )
+  end
+end
+
+RTP::LibC.fclose(video_dst_file)
+
+cmd = "ffplay -f m4v "
+cmd << "-t #{reader.av_format_ctx[:duration]} "
+cmd << "-loglevel debug "
+cmd << "raw_h264_video"
+puts "Play the output video file with the command:\n#{cmd}"
+`#{cmd}`
+
