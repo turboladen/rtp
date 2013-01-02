@@ -40,7 +40,7 @@ height = video_stream.av_codec_ctx[:height]
 cmd = "ffplay -f rawvideo "
 cmd << "-pixel_format #{pix_fmt} "
 cmd << "-video_size #{width}x#{height} "
-cmd << "-t #{reader.av_format_ctx[:duration]} "
+cmd << "-t #{reader.av_format_context[:duration]} "
 cmd << "-loglevel debug "
 cmd << "raw_video"
 puts "Play the output video file with the command:\n#{cmd}"
@@ -69,7 +69,7 @@ end
 RTP::LibC.fclose(video_dst_file)
 
 cmd = "ffplay -f m4v "
-cmd << "-t #{reader.av_format_ctx[:duration]} "
+cmd << "-t #{reader.av_format_context[:duration]} "
 cmd << "-loglevel debug "
 cmd << "raw_h264_video"
 puts "Play the output video file with the command:\n#{cmd}"

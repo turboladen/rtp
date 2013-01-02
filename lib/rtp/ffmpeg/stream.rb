@@ -81,7 +81,7 @@ module RTP
         av_packet[:data] = nil
         av_packet[:size] = 0
 
-        while av_read_frame(@reader.av_format_ctx, av_packet) >= 0
+        while av_read_frame(@reader.av_format_context, av_packet) >= 0
           log "Packet from stream number #{av_packet[:stream_index]}"
 
           if av_packet[:stream_index] == index
@@ -106,7 +106,7 @@ module RTP
         av_packet[:data] = nil
         av_packet[:size] = 0
 
-        while av_read_frame(@reader.av_format_ctx, av_packet) >= 0
+        while av_read_frame(@reader.av_format_context, av_packet) >= 0
           log "Packet from stream number #{av_packet[:stream_index]}"
 
           if av_packet[:stream_index] == index
