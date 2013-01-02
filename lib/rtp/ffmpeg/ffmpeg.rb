@@ -65,12 +65,10 @@ module RTP
     #--------------------------------------------------
     ffi_lib LIBRARY_FILENAME[:avutil]
 
-    attach_function :av_log_get_level, [], AVLogLevel
     attach_function :av_log_set_level, [AVLogLevel], :void
-    attach_function :av_free, [:pointer], :void
     attach_function :av_malloc, [:uint], :pointer
+    attach_function :av_free, [:pointer], :void
     attach_function :av_freep, [:pointer], :void
-
 
     #--------------------------------------------------
     # libavformat
@@ -141,56 +139,30 @@ module RTP
     attach_function :avcodec_open, [:pointer, :pointer], :int
     attach_function :avcodec_open2, [:pointer, :pointer, :pointer], :int
     attach_function :avcodec_alloc_frame, [], :pointer
+    attach_function :av_init_packet, [:pointer], :void
 
     if old_api?
-      attach_function :avpicture_get_size, [PixelFormat, :int, :int], :int
-      attach_function :avpicture_fill,
-                      [:pointer, :pointer, PixelFormat, :int, :int],
-                      :int
       attach_function :avcodec_decode_video, [:pointer, :pointer, :pointer,
                                               :pointer, :int], :int,
                       { :blocking => true }
 
     else
-      attach_function :avpicture_get_size, [AVPixelFormat, :int, :int], :int
-      attach_function :avpicture_fill,
-        [:pointer, :pointer, AVPixelFormat, :int, :int],
-        :int
       attach_function :avcodec_decode_video2,
         [:pointer, :pointer, :pointer, :pointer],
         :int,
         { :blocking => true }
     end
 
-    attach_function :avcodec_default_get_buffer, [:pointer, :pointer], :int
-    attach_function :avcodec_default_release_buffer, [:pointer, :pointer], :int
-    attach_function :av_init_packet, [:pointer], :void
-
     ###################################################
-    #                                                 #
     #  Definitions                                    #
-    #                                                 #
     ###################################################
-
-    AV_NOPTS_VALUE       = 0x8000000000000000
     MAX_STREAMS          = 20
     MAX_REORDER_DELAY    = 16
-    MAX_STD_TIMEBASES    = 60 * 12 + 6      # new
-    AVSEEK_FLAG_BACKWARD = 1
-    AVSEEK_FLAG_BYTE     = 2
-    AVSEEK_FLAG_ANY      = 4
     AV_TIME_BASE         = 1000000
-    AV_PARSER_PTS_NB     = 4
     AV_NUM_DATA_POINTERS = old_api? ? 4 : 8
 
-
-    INBUF_SIZE = 4096
-    FF_INPUT_BUFFER_PADDING_SIZE = 8
-
     ###################################################
-    #                                                 #
     #  Data Structures                                #
-    #                                                 #
     ###################################################
     if old_api?
       warn "Using old API av_packet"
