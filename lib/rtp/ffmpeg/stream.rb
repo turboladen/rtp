@@ -24,23 +24,23 @@ module RTP
       include RTP::FFmpeg
       include LogSwitch::Mixin
 
-      attr_reader :av_stream, :av_codec_ctx
+      attr_reader :av_stream, :av_codec_context
 
       def initialize(av_stream, av_format_context)
         @av_stream = av_stream
         @av_format_context = av_format_context
-        @av_codec_ctx = AVCodecContext.new(@av_stream[:codec])
+        @av_codec_context = AVCodecContext.new(@av_stream[:codec])
 
         # open the codec
-        codec = FFmpeg.avcodec_find_decoder(@av_codec_ctx[:codec_id])
+        codec = FFmpeg.avcodec_find_decoder(@av_codec_context[:codec_id])
 
         if codec.null?
-          raise RuntimeError, "No decoder found for #{@av_codec_ctx[:codec_id]}"
+          raise RuntimeError, "No decoder found for #{@av_codec_context[:codec_id]}"
         end
 
-        #avcodec_open(@av_codec_ctx, codec) == 0 or
+        #avcodec_open(@av_codec_context, codec) == 0 or
         #  raise RuntimeError, "avcodec_open() failed"
-        rc = avcodec_open2(@av_codec_ctx, codec, nil)
+        rc = avcodec_open2(@av_codec_context, codec, nil)
         raise "Couldn't open codec" if rc < 0
 
         # Set up finalizer to free up resources
@@ -48,7 +48,7 @@ module RTP
       end
 
       def self.finalize(id)
-        avcodec_close(@av_codec_ctx)
+        avcodec_close(@av_codec_context)
       end
 
       def discard=(value)
@@ -60,8 +60,8 @@ module RTP
       end
 
       def type
-        log "type #{@av_codec_ctx[:codec_type]}"
-        @av_codec_ctx[:codec_type]
+        log "type #{@av_codec_context[:codec_type]}"
+        @av_codec_context[:codec_type]
       end
 
       def index

@@ -10,13 +10,13 @@ module RTP
         include LogSwitch::Mixin
 
         attr_reader :raw_frame, :width, :height, :pixel_format
-        attr_reader :av_codec_ctx
 
         def initialize(av_stream, av_format_context)
           super(av_stream, av_format_context)
-          @width = @av_codec_ctx[:width]
-          @height = @av_codec_ctx[:height]
-          @pixel_format = @av_codec_ctx[:pix_fmt]
+
+          @width = @av_codec_context[:width]
+          @height = @av_codec_context[:height]
+          @pixel_format = @av_codec_context[:pix_fmt]
 
           log "format: #{@pixel_format}"
           log "width: #{@width}"
@@ -34,10 +34,10 @@ module RTP
 
         def decode_frame(packet)
           len = if FFmpeg.old_api?
-            avcodec_decode_video(@av_codec_ctx, @raw_frame.av_frame,
+            avcodec_decode_video(@av_codec_context, @raw_frame.av_frame,
               @frame_finished, packet[:data], packet[:size])
           else
-            avcodec_decode_video2(@av_codec_ctx, @raw_frame.av_frame,
+            avcodec_decode_video2(@av_codec_context, @raw_frame.av_frame,
               @frame_finished, packet)
           end
 

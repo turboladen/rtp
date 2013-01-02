@@ -48,15 +48,15 @@ module RTP
       len = RTP::FFmpeg.av_image_alloc(
         av_picture[:data],
         av_picture[:linesize],
-        @stream.av_codec_ctx[:width],
-        @stream.av_codec_ctx[:height],
-        @stream.av_codec_ctx[:pix_fmt],
+        @stream.av_codec_context[:width],
+        @stream.av_codec_context[:height],
+        @stream.av_codec_context[:pix_fmt],
         1       # align
       )
       if len < 0
-        p @stream.av_codec_ctx[:width]
-        p @stream.av_codec_ctx[:height]
-        p @stream.av_codec_ctx[:pix_fmt]
+        p @stream.av_codec_context[:width]
+        p @stream.av_codec_context[:height]
+        p @stream.av_codec_context[:pix_fmt]
         raise "Could not allocate raw video buffer"
       end
 
