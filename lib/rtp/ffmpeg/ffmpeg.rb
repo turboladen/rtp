@@ -206,7 +206,6 @@ module RTP
       require_relative 'api/av_packet'
       require_relative 'api/av_stream'
       require_relative 'api/av_codec_context'
-      require_relative 'api/av_codec'
       require_relative 'api/av_format_context'
       require_relative 'api/av_frame'
     end
