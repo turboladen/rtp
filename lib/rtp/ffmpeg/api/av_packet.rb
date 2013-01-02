@@ -1,9 +1,12 @@
+require_relative 'av_packet_side_data_type'
+
+
 module RTP
   module FFmpeg
     class SideData < FFI::Struct
       layout :data, :pointer,
              :size, :int,
-             :type, :int      # TODO enum AVPacketSideDatatype
+             :type, AVPacketSideDataType      # TODO enum AVPacketSideDatatype
     end
 
     class AVPacket < FFI::Struct
