@@ -1,5 +1,6 @@
 require_relative '../logger'
 require_relative 'ffmpeg'
+require_relative '../ffmpeg/api/av_picture'
 
 
 module RTP
@@ -9,6 +10,7 @@ module RTP
 
     attr_reader :av_frame, :width, :height, :pixel_format, :stream
     attr_accessor :pts, :number
+    attr_reader :buffer_size
 
     def initialize(p={})
       @stream = p[:stream]
@@ -21,53 +23,57 @@ module RTP
       raise ArgumentError, "no :heigth" unless @height
       raise ArgumentError "no :pixel_format" unless @pixel_format
 
-      @av_frame = avcodec_alloc_frame
-      raise NoMemoryError "avcodec_alloc_frame() failed" unless @av_frame
-
-      @av_frame = AVFrame.new @av_frame
+      init_destination_picture
+      init_frame
 
       # Set up our finalizer which calls av_free() on the av_frame.
       ObjectSpace.define_finalizer(self, self.class.method(:finalize).to_proc)
 
-      log "format: #{@pixel_format}"
-      log "width: #{@width}"
-      log "height: #{@height}"
       bytes = avpicture_get_size(@pixel_format, @width, @height)
       log "bytes: #{bytes}"
       @buffer = FFI::MemoryPointer.new(:uchar, bytes)
       avpicture_fill(@av_frame, @buffer, @pixel_format, @width, @height)
+      log "av_frame: #{@av_frame.to_hash}"
+
+      #@av_frame.members.each_with_index do |member, i|
+      #  log "#{member}: #{@av_frame.values.at(i)}"
+      #end
+    end
+
+    def init_frame
+      @av_frame = avcodec_alloc_frame
+      raise NoMemoryError "avcodec_alloc_frame() failed" unless @av_frame
+      @av_frame = AVFrame.new(@av_frame)
+    end
+
+    def init_destination_picture
+      av_picture = RTP::FFmpeg::AVPicture.new
+
+      len = RTP::FFmpeg.av_image_alloc(
+        av_picture[:data],
+        av_picture[:linesize],
+        @stream.av_codec_ctx[:width],
+        @stream.av_codec_ctx[:height],
+        @stream.av_codec_ctx[:pix_fmt],
+        1       # align
+      )
+      if len < 0
+        p @stream.av_codec_ctx[:width]
+        p @stream.av_codec_ctx[:height]
+        p @stream.av_codec_ctx[:pix_fmt]
+        raise "Could not allocate raw video buffer"
+      end
+
+      @buffer_size = len
     end
 
     def self.finalize(id)
+      #av_free(@buffer)
       av_free(@av_frame)
     end
 
     def key_frame?
       @av_frame[:key_frame] == 1
     end
-
-=begin
-    def scale(p={})
-      width = p[:width] || @width
-      height = p[:height] || @height
-      pixel_format = p[:pixel_format] || @pixel_format
-      out = FFmpeg::Frame::Video.new(:width => width, :height => height,
-        :pixel_format => pixel_format,
-        :stream => stream)
-
-      scale_ctx = sws_getContext(@width, @height, @pixel_format,
-        width, height, pixel_format,
-        :bicubic, nil, nil, nil) or
-        raise NoMemoryError, "sws_getContext() failed"
-
-      rc = sws_scale(scale_ctx, @av_frame[:data], @av_frame[:linesize], 0,
-        @height, out.av_frame[:data], out.av_frame[:linesize])
-      sws_freeContext(scale_ctx)
-
-      out.pts = @pts
-      out.number = @number
-      out
-    end
-=end
   end
 end
