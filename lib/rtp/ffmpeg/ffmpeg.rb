@@ -152,24 +152,17 @@ module RTP
     else
       attach_function :avpicture_get_size, [AVPixelFormat, :int, :int], :int
       attach_function :avpicture_fill,
-                      [:pointer, :pointer, AVPixelFormat, :int, :int],
-                      :int
+        [:pointer, :pointer, AVPixelFormat, :int, :int],
+        :int
+      attach_function :avcodec_decode_video2,
+        [:pointer, :pointer, :pointer, :pointer],
+        :int,
+        { :blocking => true }
     end
 
-    attach_function :avcodec_decode_video2, [:pointer, :pointer, :pointer,
-                                             :pointer], :int,
-                    { :blocking => true }
     attach_function :avcodec_default_get_buffer, [:pointer, :pointer], :int
     attach_function :avcodec_default_release_buffer, [:pointer, :pointer], :int
-
-
-
     attach_function :av_init_packet, [:pointer], :void
-
-    ffi_lib FFI::Library::LIBC
-    attach_function :fopen, [:pointer, :pointer], :pointer
-    attach_function :fwrite, [:pointer, :uint, :uint, :pointer], :uint
-    attach_function :fclose, [:pointer], :int
 
     ###################################################
     #                                                 #
