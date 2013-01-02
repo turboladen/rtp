@@ -84,7 +84,7 @@ module RTP
     end
 
     def self.finalize(id)
-      av_close_input_file(@av_format_context)
+      avformat_close_input(@av_format_context)
     end
 
     private
