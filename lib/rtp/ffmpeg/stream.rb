@@ -24,11 +24,11 @@ module RTP
       include RTP::FFmpeg
       include LogSwitch::Mixin
 
-      attr_reader :reader, :av_stream, :av_codec_ctx
+      attr_reader :av_stream, :av_codec_ctx
 
-      def initialize(p={})
-        @reader = p[:reader] or raise ArgumentError, "no :reader"
-        @av_stream = p[:av_stream] or raise ArgumentError, "no :av_stream"
+      def initialize(av_stream, av_format_context)
+        @av_stream = av_stream
+        @av_format_context = av_format_context
         @av_codec_ctx = AVCodecContext.new(@av_stream[:codec])
 
         # open the codec
@@ -81,7 +81,7 @@ module RTP
         av_packet[:data] = nil
         av_packet[:size] = 0
 
-        while av_read_frame(@reader.av_format_context, av_packet) >= 0
+        while av_read_frame(@av_format_context, av_packet) >= 0
           log "Packet from stream number #{av_packet[:stream_index]}"
 
           if av_packet[:stream_index] == index
@@ -106,7 +106,7 @@ module RTP
         av_packet[:data] = nil
         av_packet[:size] = 0
 
-        while av_read_frame(@reader.av_format_context, av_packet) >= 0
+        while av_read_frame(@av_format_context, av_packet) >= 0
           log "Packet from stream number #{av_packet[:stream_index]}"
 
           if av_packet[:stream_index] == index

@@ -99,12 +99,10 @@ module RTP
         @streams << case av_stream.codec_type
         when :video
           log "Video stream"
-          FFmpeg::Streams::Video.new(:reader => self,
-            :av_stream => av_stream)
+          FFmpeg::Streams::Video.new(av_stream, @av_format_context)
         else
           log "Unsupported stream"
-          FFmpeg::Streams::Unsupported.new(:reader => self,
-            :av_stream => av_stream)
+          FFmpeg::Streams::Unsupported.new(av_stream, @av_format_context)
         end
 
         # TODO: fix for 2nd stream

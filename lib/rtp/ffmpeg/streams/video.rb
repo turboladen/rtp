@@ -9,11 +9,11 @@ module RTP
       class Video < RTP::FFmpeg::Stream
         include LogSwitch::Mixin
 
-        attr_reader :raw_frame, :width, :height, :pixel_format, :reader
+        attr_reader :raw_frame, :width, :height, :pixel_format
         attr_reader :av_codec_ctx
 
-        def initialize(p={})
-          super(p)
+        def initialize(av_stream, av_format_context)
+          super(av_stream, av_format_context)
           @width = @av_codec_ctx[:width]
           @height = @av_codec_ctx[:height]
           @pixel_format = @av_codec_ctx[:pix_fmt]
@@ -49,8 +49,7 @@ module RTP
             warn "Negative return on decompressing frame; could be an error..."
           end
 
-          #if @frame_finished.read_int == 0
-          if @frame_finished
+          if @frame_finished.read_int >= 0
             log "Frame info:"
             log "\tpict num: #{@raw_frame.av_frame[:coded_picture_number]}"
             log "\tpts: #{@raw_frame.av_frame[:pts]}"
