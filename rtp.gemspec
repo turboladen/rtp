@@ -19,8 +19,8 @@ Gem::Specification.new do |s|
   s.require_paths = %w(lib)
 
   s.add_dependency "bindata", "~> 1.4"
+  s.add_dependency "ffi"
   s.add_dependency "log_switch", ">=0.4.0"
-  s.add_dependency "os", ">=0.9.6"
   s.add_dependency("sys-proctable", "~> 0.9.2") unless RUBY_PLATFORM == "java"
 
   s.add_development_dependency "bundler"
