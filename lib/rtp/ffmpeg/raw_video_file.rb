@@ -34,7 +34,7 @@ module RTP
           @file
         )
 
-        RTP::FFmpeg.av_freep(dest_picture[:data])
+        RTP::FFmpeg.av_freep(dest_picture)
       end
 
       def close
