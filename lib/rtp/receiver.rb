@@ -1,5 +1,6 @@
-require 'tempfile'
+require 'ipaddr'
 require 'socket'
+require 'tempfile'
 require 'timeout'
 
 require_relative 'logger'
@@ -227,7 +228,7 @@ module RTP
       end
 
       set_socket_time_options(socket)
-      setup_multicast_socket(socket, multicast_address) if multicast?
+      setup_multicast_socket(socket, ip_address) if multicast?
 
       @rtp_port = port
       log "#{protocol} server setup to receive on port #{@rtp_port}"
