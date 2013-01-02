@@ -34,10 +34,6 @@ module RTP
       @buffer = FFI::MemoryPointer.new(:uchar, bytes)
       avpicture_fill(@av_frame, @buffer, @pixel_format, @width, @height)
       log "av_frame: #{@av_frame.to_hash}"
-
-      #@av_frame.members.each_with_index do |member, i|
-      #  log "#{member}: #{@av_frame.values.at(i)}"
-      #end
     end
 
     def init_frame
@@ -68,7 +64,7 @@ module RTP
     end
 
     def self.finalize(id)
-      #av_free(@buffer)
+      av_free(@buffer)
       av_free(@av_frame)
     end
 
