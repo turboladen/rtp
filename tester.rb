@@ -11,10 +11,10 @@ video_stream = reader.streams.find { |stream| stream.type == :video }
 abort "No video stream found" unless video_stream
 pp video_stream
 
-=begin
 video_dst_file = RTP::FFmpeg::RawVideoFile.new('raw_video',
   video_stream.width,
-  video_stream.height)
+  video_stream.height,
+  video_stream.pixel_format)
 
 video_stream.each_frame do |frame|
   puts "frame pict type: #{frame.av_frame[:pict_type]}"
@@ -27,8 +27,7 @@ video_stream.each_frame do |frame|
   puts "frame quality: #{frame.av_frame[:quality]}"
   puts "frame packet size: #{frame.av_frame[:pkt_size]}"
 
-  video_dst_file.line_size = frame.av_frame[:linesize][0]
-  video_dst_file.write(frame.av_frame[:data][0])
+  video_dst_file.write(frame.av_frame[:data], frame.av_frame[:linesize])
 end
 
 video_dst_file.close
@@ -42,7 +41,7 @@ cmd << "raw_video"
 puts "Play the output video file with the command:\n#{cmd}"
 `#{cmd}`
 
-=end
+=begin
 
 video_dst_file = RTP::LibC.fopen('raw_mpeg4_video', 'wb')
 
@@ -66,3 +65,4 @@ cmd << "raw_h264_video"
 puts "Play the output video file with the command:\n#{cmd}"
 `#{cmd}`
 
+=end

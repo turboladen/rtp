@@ -22,13 +22,7 @@ module RTP
           log "width: #{@width}"
           log "height: #{@height}"
 
-          @raw_frame = FFmpeg::VideoFrame.new(
-            :stream => self,
-            :width => @width,
-            :height => @height,
-            :pixel_format => @pixel_format
-          )
-
+          @raw_frame = FFmpeg::VideoFrame.new(@width, @height, @pixel_format)
           @frame_finished = FFI::MemoryPointer.new(:int)
         end
 

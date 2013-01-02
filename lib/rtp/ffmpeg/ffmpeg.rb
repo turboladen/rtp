@@ -69,6 +69,8 @@ module RTP
     attach_function :av_log_set_level, [AVLogLevel], :void
     attach_function :av_free, [:pointer], :void
     attach_function :av_malloc, [:uint], :pointer
+    attach_function :av_freep, [:pointer], :void
+
 
     #--------------------------------------------------
     # libavformat

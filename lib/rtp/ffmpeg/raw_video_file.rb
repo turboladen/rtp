@@ -1,39 +1,71 @@
 require_relative '../libc'
+require_relative 'api/av_picture'
 
 
 module RTP
   module FFmpeg
     class RawVideoFile
-      attr_accessor :line_size
-      attr_accessor :height
-
-      def initialize(file_name, width, height)
+      def initialize(file_name, width, height, pixel_format)
         @file = RTP::LibC.fopen(file_name, 'wb')
         @width = width
         @height = height
+        @pixel_format = pixel_format
       end
 
-      def write(data)
-        raise "Must set #height before writing" unless @height
-        raise "Must set #line_size before writing" unless @line_size
-        line_number = 0
+      # Properly aligns frames before writing to file, then writes the frame out
+      # to the file.
+      #
+      # @param [FFI::Struct::InlineArray] data +data+ infor from an
+      #   RTP::FFmpeg::AVFrame.
+      # @param [Fixnum] line_size +linesize+ info from an RTP::FFmpeg::AVFrame.
+      def write(data, line_size)
+        dest_picture, destination_buffer_size = init_destination_picture
 
-        while line_number < @height
-          unless data.null?
-            RTP::LibC.fwrite(
-              data + line_number * @line_size,
-              1,
-              @width,
-              @file
-            )
-          end
+        RTP::FFmpeg.av_image_copy(
+          dest_picture[:data], dest_picture[:linesize],
+          data, line_size,
+          @pixel_format, @width, @height
+        )
 
-          line_number += 1
-        end
+        RTP::LibC.fwrite(
+          dest_picture[:data][0],
+          1,
+          destination_buffer_size,
+          @file
+        )
+
+        RTP::FFmpeg.av_freep(dest_picture[:data])
       end
 
       def close
         RTP::LibC.fclose(@file)
+      end
+
+      private
+
+      # @return [Array<RTP::FFmpeg::AVPicture,Fixnum>]
+      def init_destination_picture
+        dest_picture = RTP::FFmpeg.avcodec_alloc_frame
+        raise NoMemoryError unless dest_picture
+        dest_picture = RTP::FFmpeg::AVPicture.new(dest_picture)
+
+        destination_buffer_size = RTP::FFmpeg.av_image_alloc(
+          dest_picture[:data],
+          dest_picture[:linesize],
+          @width,
+          @height,
+          @pixel_format,
+          1 # align
+        )
+
+        if destination_buffer_size < 0
+          p @width
+          p @height
+          p @pixel_format
+          raise "Could not allocate raw video buffer"
+        end
+
+        return dest_picture, destination_buffer_size
       end
     end
   end

@@ -8,33 +8,43 @@ module RTP
     include RTP::FFmpeg
     include LogSwitch::Mixin
 
-    attr_reader :av_frame, :width, :height, :pixel_format, :stream
+    attr_reader :av_frame, :width, :height, :pixel_format
     attr_accessor :pts, :number
     attr_reader :buffer_size
 
-    def initialize(p={})
-      @stream = p[:stream]
-      @width = p[:width]
-      @height = p[:height]
-      @pixel_format = p[:pixel_format]
+    def initialize(width, height, pixel_format)
+      @width = width
+      @height = height
+      @pixel_format = pixel_format
 
-      raise ArgumentError, "no :stream" unless @stream
       raise ArgumentError, "no :width" unless @width
       raise ArgumentError, "no :heigth" unless @height
       raise ArgumentError "no :pixel_format" unless @pixel_format
 
-      init_destination_picture
+      #destination_picture = init_destination_picture
       init_frame
+
+      #bytes = avpicture_get_size(@pixel_format, @width, @height)
+      #log "bytes: #{bytes}"
+
+      #@buffer = FFI::MemoryPointer.new(:uchar, bytes)
+      #avpicture_fill(@av_frame, @buffer, @pixel_format, @width, @height)
+      #log "av_frame: #{@av_frame.to_hash}"
 
       # Set up our finalizer which calls av_free() on the av_frame.
       ObjectSpace.define_finalizer(self, self.class.method(:finalize).to_proc)
-
-      bytes = avpicture_get_size(@pixel_format, @width, @height)
-      log "bytes: #{bytes}"
-      @buffer = FFI::MemoryPointer.new(:uchar, bytes)
-      avpicture_fill(@av_frame, @buffer, @pixel_format, @width, @height)
-      log "av_frame: #{@av_frame.to_hash}"
     end
+
+    def self.finalize(id)
+      av_free(@buffer)
+      av_free(@av_frame)
+    end
+
+    def key_frame?
+      @av_frame[:key_frame] == 1
+    end
+
+    private
 
     def init_frame
       @av_frame = avcodec_alloc_frame
@@ -48,28 +58,20 @@ module RTP
       len = RTP::FFmpeg.av_image_alloc(
         av_picture[:data],
         av_picture[:linesize],
-        @stream.av_codec_context[:width],
-        @stream.av_codec_context[:height],
-        @stream.av_codec_context[:pix_fmt],
+        @width,
+        @height,
+        @pixel_format,
         1       # align
       )
+
       if len < 0
-        p @stream.av_codec_context[:width]
-        p @stream.av_codec_context[:height]
-        p @stream.av_codec_context[:pix_fmt]
+        p @width
+        p @height
+        p @pixel_format
         raise "Could not allocate raw video buffer"
       end
 
-      @buffer_size = len
-    end
-
-    def self.finalize(id)
-      av_free(@buffer)
-      av_free(@av_frame)
-    end
-
-    def key_frame?
-      @av_frame[:key_frame] == 1
+      av_picture
     end
   end
 end
