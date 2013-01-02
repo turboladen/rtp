@@ -19,7 +19,7 @@ module RTP
       FFmpeg.av_log_set_level(:debug)
 
       open_file(filename)
-      get_stream_info
+      find_stream_info
 
       # Set up finalizer to free up resources
       ObjectSpace.define_finalizer(self, self.class.method(:finalize).to_proc)
@@ -39,13 +39,14 @@ module RTP
         raise RuntimeError, "av_open_input_file() failed, filename='%s', rc=%d" %
           [filename, return_code]
       end
+
+      @av_format_context = AVFormatContext.new(@av_format_context.get_pointer(0))
     end
 
     # Gets info about the streams in the file.
     #
     # @raise [RuntimeError] If FFmpeg wasn't able to find stream info.
-    def get_stream_info
-      @av_format_context = AVFormatContext.new(@av_format_context.get_pointer(0))
+    def find_stream_info
       return_code = av_find_stream_info(@av_format_context)
 
       if return_code < 0
@@ -92,12 +93,8 @@ module RTP
       @av_format_context[:nb_streams].times do |i|
         av_stream = AVStream.new(@av_format_context[:streams][i].get_pointer(0))
 
-        #av_stream.members.each_with_index do |member, i|
-        #  log "#{member}: #{av_stream.values.at(i)}"
-        #end
         log "Stream #{i} info:"
-        #log "Codec type: #{av_stream.codec_type}"
-        #pp av_stream.to_hash
+        log "Codec type: #{av_stream.codec_type}"
 
         @streams << case av_stream.codec_type
         when :video

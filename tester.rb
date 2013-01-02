@@ -51,11 +51,6 @@ puts "Play the output video file with the command:\n#{cmd}"
 video_dst_file = RTP::LibC.fopen('raw_mpeg4_video', 'wb')
 
 video_stream.each_packet do |packet|
-  puts "Packet pts: #{packet[:pts]}"
-  puts "Packet dts: #{packet[:dts]}"
-  puts "Packet duration: #{packet[:duration]}"
-  puts "Packet pos: #{packet[:pos]}"
-
   unless packet[:data].null?
     RTP::LibC.fwrite(
       packet[:data],
