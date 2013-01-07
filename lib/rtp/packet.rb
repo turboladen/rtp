@@ -70,7 +70,7 @@ module RTP
     count_bytes_remaining :bytes_remaining
 
     # @return [BinData::String]
-    string :rtp_payload, read_length: lambda { bytes_remaining }
+    string :payload, read_length: lambda { bytes_remaining }
 
     def has_extension?
       extension == 1

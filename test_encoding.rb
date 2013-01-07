@@ -1,7 +1,9 @@
 require './lib/rtp/encoder'
 
 
+#Pants.logger = Logger.new('log.log')
 Pants.log = true
+#RTP::Logger.logger = Pants.logger
 RTP::Logger.log = true
 
 av_file = '../effer/spec/support/sample_mpeg4_iTunes.mov'
@@ -10,13 +12,11 @@ rtp_video_file = 'rtp_video_file'
 
 
 Pants.demux(av_file, 0) do |demuxer|
-  demuxer.add_writer(raw_video_file)
-  encoder = demuxer.add_writer(:rtp_encoder)
+  #demuxer.add_writer(raw_video_file)
+  encoder = demuxer.add_seam(RTP::Encoder, demuxer.codec_id, demuxer.frame_rate)
 
-  encoder.tee do |reader|
-    reader.add_writer(rtp_video_file)
-    reader.add_writer('udp://127.0.0.1:5004')
-  end
+  #encoder.add_writer(rtp_video_file)
+  encoder.add_writer('udp://127.0.0.1:5004')
 end
 
 =begin
@@ -38,14 +38,20 @@ pants.run
 
 
 if defined? av_file
-  raw_video_file_size = File.stat(raw_video_file).size
-  rtp_video_file_size = File.stat(rtp_video_file).size
   orig_file_size = File.stat(av_file).size
-
   puts "Original file size: #{orig_file_size}"
-  puts "Raw video file size: #{raw_video_file_size}"
-  puts "RTP video file size: #{rtp_video_file_size}"
 
-  puts "Raw difference: #{orig_file_size - raw_video_file_size}"
-  puts "RTP difference: #{orig_file_size - rtp_video_file_size}"
+  if File.exists?(rtp_video_file)
+    rtp_video_file_size = File.stat(rtp_video_file).size if File.exists?(rtp_video_file)
+    puts "RTP video file size: #{rtp_video_file_size}" if File.exists?(rtp_video_file)
+    puts "RTP difference: #{orig_file_size - rtp_video_file_size}"
+    #FileUtils.rm(rtp_video_file)
+  end
+
+  if File.exists?(raw_video_file)
+    raw_video_file_size = File.stat(raw_video_file).size
+    puts "Raw video file size: #{raw_video_file_size}" if File.exists?(raw_video_file)
+    puts "Raw difference: #{orig_file_size - raw_video_file_size}"
+    FileUtils.rm(raw_video_file)
+  end
 end
