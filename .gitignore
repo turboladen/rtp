@@ -20,3 +20,6 @@ rtp*.gem
 
 # Rubinius
 .rbx/
+
+# Project files
+atlassian-ide-plugin.xml
