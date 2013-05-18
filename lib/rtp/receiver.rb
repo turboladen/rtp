@@ -75,7 +75,7 @@ module RTP
 
       @socket = nil
       @listener = nil
-      @packet_writer = nil
+      @writer_thread = nil
       @packets = Queue.new
       @packet_timestamps = []
     end
@@ -106,8 +106,8 @@ module RTP
       return false if running?
       log "Starting receiving on port #{@rtp_port}..."
 
-      @packet_writer = start_packet_writer(&block)
-      @packet_writer.abort_on_exception = true
+      @writer_thread = start_packet_writer(&block)
+      @writer_thread.abort_on_exception = true
 
       @socket = init_socket(@transport_protocol, @rtp_port, @ip_address)
 
@@ -141,7 +141,7 @@ module RTP
 
     # @return [Boolean] true if ready to write packets to file.
     def writing_packets?
-      !@packet_writer.nil? ? @packet_writer.alive? : false
+      !@writer_thread.nil? ? @writer_thread.alive? : false
     end
 
     # @return [Boolean] true if the Receiver is listening and writing packets.
@@ -186,7 +186,7 @@ module RTP
     #   socket.
     # @return [Thread] The packet writer thread.
     def start_packet_writer(&block)
-      return @packet_writer if @packet_writer
+      return @writer_thread if @writer_thread
 
       # If a block is given for packet inspection, perhaps we should save
       # some I/O ano not write the packet to file?
@@ -290,8 +290,8 @@ module RTP
         stop_listener
       end
 
-      @packet_writer.kill if writing_packets?
-      @packet_writer = nil
+      @writer_thread.kill if writing_packets?
+      @writer_thread = nil
       log "Packet writer stopped."
 
       @capture_file.close
