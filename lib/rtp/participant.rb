@@ -22,6 +22,12 @@ module RTP
       session = RTP::Session.new(ssrc, ip, rtp_port, rtcp_port)
 
       @sessions << session
+      starter = proc { session.start }
+      if EM.reactor_running?
+        starter.call
+      else
+        EM.run { starter.call }
+      end
 
       session
     end
