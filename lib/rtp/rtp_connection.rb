@@ -17,7 +17,7 @@ module RTP
     #   get called when RTP packets are received.
     # @param [Boolean] strip_headers If set to true, RTP headers will
     #   be stripped from packets before they're passed on to the callback.
-    def initialize(ssrc, receive_callback: nil,
+    def initialize(ssrc, receive_callback=nil,
       strip_headers: false, capture_file: Tempfile.new(DEFAULT_CAPFILE_NAME)
       )
       @ssrc = ssrc
@@ -45,7 +45,11 @@ module RTP
       packet = RTPPacket.read(data)
       data_to_write = @strip_headers ? packet.rtp_payload : packet
 
-      @receive_callback.call(data_to_write)
+      if @receive_callback
+        @receive_callback.call(data_to_write)
+      else
+        data_to_write
+      end
     end
   end
 end
