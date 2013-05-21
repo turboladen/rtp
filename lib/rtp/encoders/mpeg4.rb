@@ -1,4 +1,4 @@
-require_relative '../packet'
+require_relative '../rtp_packet'
 require_relative '../logger'
 
 
@@ -60,7 +60,7 @@ module RTP
       private
 
       def encode_packet(av_packet, ssrc, last_in_vop)
-        rtp_packet = RTP::Packet.new
+        rtp_packet = RTP::RTPPacket.new
         rtp_packet.version        = 2
         rtp_packet.marker         = last_in_vop ? 1 : 0
         rtp_packet.payload_type   = 96

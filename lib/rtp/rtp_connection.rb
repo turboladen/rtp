@@ -1,7 +1,7 @@
 require 'tempfile'
 require 'eventmachine'
 
-require_relative 'packet'
+require_relative 'rtp_packet'
 require_relative 'logger'
 
 
@@ -36,13 +36,13 @@ module RTP
       end
     end
 
-    # Receives data on the socket, parses it as an RTP::Packet, strips headers
-    # (if set to do so), then yields the Packet to the callback that was given
+    # Receives data on the socket, parses it as an RTP::RTPPacket, strips headers
+    # (if set to do so), then yields the RTPPacket to the callback that was given
     # at init.
     def receive_data(data)
       log "Got RTP data, size: #{data.size}"
 
-      packet = Packet.read(data)
+      packet = RTPPacket.read(data)
       data_to_write = @strip_headers ? packet.rtp_payload : packet
 
       @receive_callback.call(data_to_write)

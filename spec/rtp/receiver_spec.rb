@@ -150,7 +150,7 @@ describe RTP::Receiver do
 
   describe '#start_packet_writer' do
     context 'packet writer running' do
-      let(:packet) { double 'RTP::Packet' }
+      let(:packet) { double 'RTP::RTPPacket' }
       let(:msg) { 'the data' }
       let(:timestamp) { '12345' }
 
@@ -164,7 +164,7 @@ describe RTP::Receiver do
       before do
         Thread.should_receive(:start).and_yield
         subject.should_receive(:loop).and_yield
-        RTP::Packet.should_receive(:read).with(msg).and_return packet
+        RTP::RTPPacket.should_receive(:read).with(msg).and_return packet
         subject.instance_variable_set(:@packets, packets)
       end
 

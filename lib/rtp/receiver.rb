@@ -5,7 +5,7 @@ require 'timeout'
 
 require_relative 'logger'
 require_relative 'error'
-require_relative 'packet'
+require_relative 'rtp_packet'
 
 
 module RTP
@@ -82,7 +82,7 @@ module RTP
 
     # Starts the packet writer (buffer) and listener.
     #
-    # If a block is given, this will yield each parsed packet as an RTP::Packet.
+    # If a block is given, this will yield each parsed packet as an RTP::RTPPacket.
     # This lets you inspect packets as they come in:
     # @example Just the packet
     #   receiver = RTP::Receiver.new
@@ -97,7 +97,7 @@ module RTP
     #     puts timestamp
     #   end
     #
-    # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
+    # @yield [RTP::RTPPacket] Each parsed packet that comes in over the wire.
     # @yield [Time] The timestamp from the packet as it was received on the
     #   socket.
     #
@@ -177,11 +177,11 @@ module RTP
     # This starts a new Thread for reading packets off of the list of packets
     # that has been read in by the listener.  If no block is given, this writes
     # all received packets (in the @packets Queue) to the +capture_file+.  If a
-    # block is given, it yields each packet, parsed as an RTP::Packet as well as
+    # block is given, it yields each packet, parsed as an RTP::RTPPacket as well as
     # the timestamp from that packet as it was received on the socket.  If
     # +strip_headers+ is set, it only writes/yields the RTP payload to the file.
     #
-    # @yield [RTP::Packet] Each parsed packet that comes in over the wire.
+    # @yield [RTP::RTPPacket] Each parsed packet that comes in over the wire.
     # @yield [Time] The timestamp from the packet as it was received on the
     #   socket.
     # @return [Thread] The packet writer thread.
@@ -193,7 +193,7 @@ module RTP
       Thread.start do
         loop do
           msg, timestamp = @packets.pop
-          packet = RTP::Packet.read(msg)
+          packet = RTP::RTPPacket.read(msg)
 
           data_to_write = @strip_headers ? packet.rtp_payload : packet
 
