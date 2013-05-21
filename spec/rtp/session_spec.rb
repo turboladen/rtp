@@ -7,9 +7,10 @@ describe RTP::Session do
   let(:ip) { '1.2.3.4' }
   let(:rtp_port) { 11111 }
   let(:rtcp_port) { 22222 }
+  let(:rtp_callback) { proc {} }
 
   subject do
-    RTP::Session.new(ssrc, ip, rtp_port, rtcp_port)
+    RTP::Session.new(ssrc, ip, rtp_port, rtcp_port, &rtp_callback)
   end
 
   its(:ssrc) { should eq ssrc }
@@ -20,7 +21,7 @@ describe RTP::Session do
   describe '#start_rtp' do
     it 'opens a UDP connection on the IP and RTP port' do
       EM.should_receive(:open_datagram_socket).
-        with(ip, rtp_port, RTP::RTPConnection, ssrc)
+        with(ip, rtp_port, RTP::RTPConnection, ssrc, rtp_callback)
 
       subject.send(:start_rtp)
     end

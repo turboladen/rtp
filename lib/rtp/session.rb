@@ -20,11 +20,12 @@ module RTP
     # @param [String] ip
     # @param [Fixnum] rtp_port
     # @param [Fixnum] rtcp_port
-    def initialize(ssrc, ip, rtp_port, rtcp_port)
+    def initialize(ssrc, ip, rtp_port, rtcp_port, &rtp_callback)
       @ssrc = ssrc
       @ip = ip
       @rtp_port = rtp_port
       @rtcp_port = rtcp_port
+      @rtp_callback = EM.Callback(rtp_callback) if rtp_callback
     end
 
     # Opens the RTP and RTCP ports.
@@ -43,7 +44,7 @@ module RTP
     # Starts the connection for RTP.
     def start_rtp
       puts "Opening RTP socket on #{@ip}:#{@rtp_port}"
-      EM.open_datagram_socket(@ip, @rtp_port, RTPConnection, @ssrc)
+      EM.open_datagram_socket(@ip, @rtp_port, RTPConnection, @ssrc, @rtp_callback)
     end
 
     # Starts the connection for RTCP.

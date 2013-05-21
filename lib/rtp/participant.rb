@@ -17,12 +17,13 @@ module RTP
     # @param [Fixnum] rtcp_port
     #
     # @return [RTP::Session]
-    def join_session(ip, rtp_port, rtcp_port=rtp_port+1)
+    def join_session(ip, rtp_port, rtcp_port=rtp_port+1, &callback)
       ssrc = rand(4294967295)
-      session = RTP::Session.new(ssrc, ip, rtp_port, rtcp_port)
+      session = RTP::Session.new(ssrc, ip, rtp_port, rtcp_port, &callback)
 
       @sessions << session
       starter = proc { session.start }
+
       if EM.reactor_running?
         starter.call
       else
