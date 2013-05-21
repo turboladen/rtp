@@ -11,6 +11,9 @@ module RTP
 
     # Joins a RTP Session that's defined by the given RTP/RTCP IP and port and
     # adds that session to the list of sessions that it's participating in.
+    # Allows for passing a block that will get called when RTP packets are
+    # received, thus allowing you to specify what to do with the packet (i.e.
+    # write it to file, inspect it, etc.).
     #
     # @param [String] ip
     # @param [Fixnum] rtp_port

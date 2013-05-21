@@ -11,7 +11,13 @@ module RTP
 
     DEFAULT_CAPFILE_NAME = 'rtp_capture.raw'
 
-    def initialize(ssrc, receive_callback,
+    # @param [Fixnum] ssrc The synchronization source ID that identifies the
+    #   participant in a session that's using this connection.
+    # @param [EventMachine::Callback] receive_callback The callback that should
+    #   get called when RTP packets are received.
+    # @param [Boolean] strip_headers If set to true, RTP headers will
+    #   be stripped from packets before they're passed on to the callback.
+    def initialize(ssrc, receive_callback: nil,
       strip_headers: false, capture_file: Tempfile.new(DEFAULT_CAPFILE_NAME)
       )
       @ssrc = ssrc
@@ -30,6 +36,9 @@ module RTP
       end
     end
 
+    # Receives data on the socket, parses it as an RTP::Packet, strips headers
+    # (if set to do so), then yields the Packet to the callback that was given
+    # at init.
     def receive_data(data)
       log "Got RTP data, size: #{data.size}"
 
