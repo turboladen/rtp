@@ -11,7 +11,7 @@ module RTP
 
     COMPOUND_PACKET_TYPES = {
       202 => RTP::RTCPPackets::SourceDescription,
-      203 => RTP::RTCPPackets::Bye
+      203 => RTP::RTCPPackets::Goodbye
     }
 
     endian :big

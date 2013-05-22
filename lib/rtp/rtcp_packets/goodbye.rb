@@ -5,7 +5,7 @@ module RTP
   module RTCPPackets
 
     # Packet type 203, aka "BYE" packet.
-    class Bye < BinData::Record
+    class Goodbye < BinData::Record
       endian :big
 
       # The list of SSRCs that are leaving.
