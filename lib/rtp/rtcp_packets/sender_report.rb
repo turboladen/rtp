@@ -3,6 +3,8 @@ require 'bindata'
 
 module RTP
   module RTCPPackets
+
+    # Packet type 200, aka "SR" packet.
     class SenderReport < BinData::Record
       endian :big
 
@@ -14,7 +16,10 @@ module RTP
       # The time at which this RTCP sender report packet was sent.
       #
       # @return [BinData:Uint64be]
-      uint64 :ntp_timestamp
+      struct :ntp_timestamp do
+        uint32 :seconds
+        uint32 :fractions_of_second
+      end
 
       # The time at which this RTCP sender report packet was sent, but in units
       # of the RTP media clock.
