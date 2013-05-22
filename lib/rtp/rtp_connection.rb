@@ -1,12 +1,13 @@
 require 'tempfile'
 require 'eventmachine'
 
+require_relative 'connection'
 require_relative 'rtp_packet'
 require_relative 'logger'
 
 
 module RTP
-  class RTPConnection < EM::Connection
+  class RTPConnection < Connection
     include LogSwitch::Mixin
 
     DEFAULT_CAPFILE_NAME = 'rtp_capture.raw'
@@ -24,6 +25,9 @@ module RTP
       @receive_callback = receive_callback
       @strip_headers = strip_headers
       @capture_file = capture_file
+
+      ip, _ = self_info
+      setup_multicast_socket(ip) if multicast?(ip)
 
       log "RTPConnection initialized with ssrc #{@ssrc}"
 
