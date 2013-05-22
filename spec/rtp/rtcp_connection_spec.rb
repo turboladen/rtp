@@ -7,46 +7,47 @@ describe RTP::RTCPConnection do
     RTP::RTCPConnection.any_instance.stub(:self_info).and_return 'localhost'
   end
 
-  subject { RTP::RTCPConnection.new(1) }
+  let(:receiver) { double 'EM.Callback' }
+  let(:sender) { double 'EM.Callback' }
+  let(:packet) { double 'RTP::RTCPPacket' }
+
+  subject { RTP::RTCPConnection.new(1, receiver, sender) }
 
   describe '#receive_data' do
     let(:data) { double 'data', size: 1 }
-    let(:callback) { double 'EM.Callback' }
 
     it 'parses the data' do
       RTP::RTCPPacket.should_receive(:read).with data
+      receiver.stub(:call)
 
       subject.receive_data(data)
     end
 
-    context 'callback is given' do
-      let(:packet) { double 'RTP::RTCPPacket' }
-
+    context 'receiver callback is given' do
       before do
         RTP::RTCPPacket.stub(:read).and_return packet
       end
 
       subject do
-        RTP::RTCPConnection.new(1, callback)
+        RTP::RTCPConnection.new(1, receiver, sender)
       end
 
-      it 'calls the callback with the parsed packet' do
-        callback.should_receive(:call).with packet
+      it 'calls the receiver callback with the parsed packet' do
+        receiver.should_receive(:call).with packet
 
         subject.receive_data(data)
       end
     end
 
-    context 'callback is not given' do
-      let(:callback) { double 'EM.Callback' }
-      let(:packet) { double 'RTP::RTCPPacket' }
+    context 'receiver is not given' do
+      subject { RTP::RTCPConnection.new(1, nil, sender) }
 
       before do
         RTP::RTCPPacket.stub(:read).and_return packet
       end
 
-      it 'does not call the callback with the parsed packet' do
-        callback.should_not_receive(:call).with packet
+      it 'does not call the receiver callback with the parsed packet' do
+        receiver.should_not_receive(:call).with packet
 
         subject.receive_data(data).should == packet
       end

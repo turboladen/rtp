@@ -2,6 +2,7 @@ require 'tempfile'
 require 'eventmachine'
 
 require_relative 'connection'
+require_relative 'encoder'
 require_relative 'rtp_packet'
 require_relative 'logger'
 
@@ -14,16 +15,18 @@ module RTP
 
     # @param [Fixnum] ssrc The synchronization source ID that identifies the
     #   participant in a session that's using this connection.
-    # @param [EventMachine::Callback,Proc] receive_callback The callback that should
+    # @param [EventMachine::Callback,Proc] receiver The callback that should
     #   get called when RTP packets are received.  Can be any object that
     #   responds to #call and takes a RTP::RTPPacket.
     # @param [Boolean] strip_headers If set to true, RTP headers will
     #   be stripped from packets before they're passed on to the callback.
-    def initialize(ssrc, receive_callback=nil,
-      strip_headers: false, capture_file: Tempfile.new(DEFAULT_CAPFILE_NAME)
+    def initialize(ssrc, receiver, sender,
+      strip_headers: false,
+      capture_file: Tempfile.new(DEFAULT_CAPFILE_NAME)
       )
       @ssrc = ssrc
-      @receive_callback = receive_callback
+      @sender = sender
+      @receiver = receiver
       @strip_headers = strip_headers
       @capture_file = capture_file
 
@@ -50,8 +53,8 @@ module RTP
       packet = RTPPacket.read(data)
       data_to_write = @strip_headers ? packet.rtp_payload : packet
 
-      if @receive_callback
-        @receive_callback.call(data_to_write)
+      if @receiver
+        @receiver.call(data_to_write)
       else
         data_to_write
       end

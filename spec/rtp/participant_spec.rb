@@ -11,15 +11,6 @@ describe RTP::Participant do
     let(:rtcp_port) { 5679 }
     let(:session) { double 'RTP::Session' }
 
-    before do
-      session.should_receive :start
-      EM.stub(:run).and_yield
-    end
-
-    after do
-      EM.unstub(:run)
-    end
-
     it 'adds the joined session to the list of sessions it is part of' do
       RTP::Session.stub(:new).and_return session
 
@@ -52,21 +43,7 @@ describe RTP::Participant do
           rtcp.should == rtcp_port
         end.and_return session
 
-        subject.join_session(ip, rtp_port, rtcp_port: rtcp_port)
-      end
-    end
-
-    context 'reactor is not running' do
-      before do
-        RTP::Session.stub(:new).and_return session
-        EM.should_receive(:reactor_running?).and_return false
-        session.stub(:start)
-      end
-
-      it 'starts the reactor' do
-        EM.should_receive(:run)
-
-        subject.join_session(ip, rtp_port)
+        subject.join_session(ip, rtp_port, rtcp_port)
       end
     end
   end
