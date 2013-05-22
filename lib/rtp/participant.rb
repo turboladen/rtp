@@ -18,11 +18,12 @@ module RTP
     # @param [String] ip
     # @param [Fixnum] rtp_port
     # @param [Fixnum] rtcp_port
+    # @param [EventMachine::Callback] rtcp_callback
     #
     # @return [RTP::Session]
-    def join_session(ip, rtp_port, rtcp_port=rtp_port+1, &callback)
+    def join_session(ip, rtp_port, rtcp_port: rtp_port+1, rtcp_callback: nil, &rtp_callback)
       ssrc = rand(4294967295)
-      session = RTP::Session.new(ssrc, ip, rtp_port, rtcp_port, &callback)
+      session = RTP::Session.new(ssrc, ip, rtp_port, rtcp_port, rtcp_callback, &rtp_callback)
 
       @sessions << session
       starter = proc { session.start }

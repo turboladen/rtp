@@ -52,7 +52,7 @@ describe RTP::Participant do
           rtcp.should == rtcp_port
         end.and_return session
 
-        subject.join_session(ip, rtp_port, rtcp_port)
+        subject.join_session(ip, rtp_port, rtcp_port: rtcp_port)
       end
     end
 

@@ -28,11 +28,28 @@ describe RTP::Session do
   end
 
   describe '#start_rtcp' do
-    it 'opens a UDP connection on the IP and RTCP port' do
-      EM.should_receive(:open_datagram_socket).
-        with(ip, rtcp_port, RTP::RTCPConnection)
+    context 'callback is provided' do
+      let(:rtcp_callback) { double 'EM.Callback' }
 
-      subject.send(:start_rtcp)
+      subject do
+        RTP::Session.new(ssrc, ip, rtp_port, rtcp_port, rtcp_callback, &rtp_callback)
+      end
+
+      it 'opens a UDP connection on the IP and RTCP port' do
+        EM.should_receive(:open_datagram_socket).
+          with(ip, rtcp_port, RTP::RTCPConnection, rtcp_callback)
+
+        subject.send(:start_rtcp)
+      end
+    end
+
+    context 'callback is not provided' do
+      it 'opens a UDP connection on the IP and RTCP port' do
+        EM.should_receive(:open_datagram_socket).
+          with(ip, rtcp_port, RTP::RTCPConnection, nil)
+
+        subject.send(:start_rtcp)
+      end
     end
   end
 end
