@@ -11,8 +11,9 @@ module RTP
   class RTCPConnection < Connection
     include LogSwitch::Mixin
 
-    # @param [EventMachine::Callback] callback The callback to call when a
-    #   packet is received and parsed.
+    # @param [EventMachine::Callback,Proc] callback The callback to call when a
+    #   packet is received and parsed.  Can be any object that responds to #call
+    #   and takes a RTP::RTCPPacket.
     def initialize(callback=nil)
       @callback = callback
 

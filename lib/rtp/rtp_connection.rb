@@ -14,8 +14,9 @@ module RTP
 
     # @param [Fixnum] ssrc The synchronization source ID that identifies the
     #   participant in a session that's using this connection.
-    # @param [EventMachine::Callback] receive_callback The callback that should
-    #   get called when RTP packets are received.
+    # @param [EventMachine::Callback,Proc] receive_callback The callback that should
+    #   get called when RTP packets are received.  Can be any object that
+    #   responds to #call and takes a RTP::RTPPacket.
     # @param [Boolean] strip_headers If set to true, RTP headers will
     #   be stripped from packets before they're passed on to the callback.
     def initialize(ssrc, receive_callback=nil,
