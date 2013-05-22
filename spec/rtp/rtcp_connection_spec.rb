@@ -3,9 +3,11 @@ require 'rtp/rtcp_connection'
 
 
 describe RTP::RTCPConnection do
-  subject do
-    RTP::RTCPConnection.new(1)
+  before do
+    RTP::RTCPConnection.any_instance.stub(:self_info).and_return 'localhost'
   end
+
+  subject { RTP::RTCPConnection.new(1) }
 
   describe '#receive_data' do
     let(:data) { double 'data', size: 1 }
