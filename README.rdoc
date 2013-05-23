@@ -3,6 +3,8 @@
 http://github.com/turboladen/rtp
 
 {<img src="https://secure.travis-ci.org/turboladen/rtp.png?branch=master" alt="Build Status" />}[https://travis-ci.org/turboladen/rtp]
+{<img src="https://coveralls.io/repos/turboladen/rtp/badge.png" alt="Coverage Status" />}[https://coveralls.io/r/turboladen/rtp]
+
 
 == DESCRIPTION
 

@@ -10,4 +10,7 @@ SimpleCov.start do
   add_group 'Specs', 'spec'
 end
 
+require 'coveralls'
+Coveralls.wear!
+
 $:.unshift(File.dirname(__FILE__) + '/../lib')
