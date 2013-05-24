@@ -74,5 +74,5 @@ end
 Pants.writers << {
   uri_scheme: :rtp_encoder,
   klass: RTP::Encoder,
-  args: [:codec_id, :frame_rate]
+  args: [:codec_id, :frame_rate, :ssrc]
 }
