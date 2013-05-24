@@ -13,18 +13,17 @@ module RTP
       mpeg4: RTP::Encoders::MPEG4
     }
 
-    def initialize(main_callback, write_to_channel, codec_id, frame_rate)
+    def initialize(main_callback, read_channel, codec_id, frame_rate, ssrc)
       @send_queue = EM::Queue.new
-      start_sending
+      @ssrc = ssrc
 
-      # For now, define here...
-      @ssrc = rand(4294967295)
+      start_sending
 
       log "Codec ID: #{codec_id}"
       log "Frame rate: #{frame_rate}"
       @encoder = ENCODERS[codec_id].new(frame_rate)
 
-      super(main_callback, write_to_channel)
+      super(main_callback, read_channel)
     end
 
     def stop
@@ -36,7 +35,8 @@ module RTP
     def start
       callback = EM.Callback do
         log "#{__id__} Adding a #{self.class}..."
-        read do |av_packet|
+
+        read_items do |av_packet|
           encode(av_packet)
         end
       end
@@ -48,13 +48,13 @@ module RTP
       #rtp_packet = @encoder.encode(av_packet, @ssrc)
       #log "Encoded packet payload size: #{rtp_packet.payload.size}"
       #write(rtp_packet.to_binary_s)
-      EM.defer do
+      #EM.defer do
         @encoder.encode(av_packet, @ssrc) do |rtp_packet|
           log "Encoded packet payload size: #{rtp_packet.payload.size}"
           #write(rtp_packet.to_binary_s)
           @send_queue << rtp_packet.to_binary_s
         end
-      end
+      #end
     end
 
     def start_sending
