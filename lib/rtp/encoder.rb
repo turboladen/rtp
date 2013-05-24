@@ -2,7 +2,7 @@ require_relative '../ext/uri_rtp'
 require 'pants'
 require_relative 'logger'
 require_relative 'rtp_packet'
-Dir[File.dirname(__FILE__) + "/encoders/*.rb"].each { |f| require f }
+Dir[File.dirname(__FILE__) + '/encoders/*.rb'].each { |f| require(f) }
 
 
 module RTP
