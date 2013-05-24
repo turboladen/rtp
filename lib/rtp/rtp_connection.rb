@@ -44,6 +44,16 @@ module RTP
       end
     end
 
+    def post_init
+      if @sender
+        EM.defer do
+          @sender.call do |packet|
+            send_data(packet)
+          end
+        end
+      end
+    end
+
     # Receives data on the socket, parses it as an RTP::RTPPacket, strips headers
     # (if set to do so), then yields the RTPPacket to the callback that was given
     # at init.
