@@ -19,6 +19,6 @@ end
 
 describe RTP do
   it "should have a VERSION constant" do
-    RTP.const_defined?('VERSION').should be_true
+    RTP.const_defined?('VERSION').should be true
   end
 end
