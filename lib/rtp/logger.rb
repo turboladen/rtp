@@ -2,10 +2,10 @@ require 'log_switch'
 
 module RTP
   class Logger
-    extend LogSwitch
+    include LogSwitch
   end
 end
 
 RTP::Logger.log_class_name = true
-RTP::Logger.log = false
+RTP::Logger.logging_enabled = false
 

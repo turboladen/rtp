@@ -14,7 +14,7 @@ module RTP
   # a file, or yield the packets to a given block.  This is useful with other
   # protocols, like RTSP.
   class Receiver
-    include LogSwitch::Mixin
+    include LogSwitch
 
     # Name of the file the data will be captured to unless #rtp_file is set.
     DEFAULT_CAPFILE_NAME = "rtp_capture.raw"

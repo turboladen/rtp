@@ -2,7 +2,7 @@ require 'spec_helper'
 require 'rtp/receiver'
 
 Thread.abort_on_exception = true
-RTP::Logger.log = false
+RTP::Logger.logging_enabled = false
 
 describe RTP::Receiver do
   describe "#initialize" do
@@ -63,7 +63,7 @@ describe RTP::Receiver do
 
     context "not running" do
       before { subject.stub(:running?).and_return false }
-      specify { subject.stop.should be_false }
+      specify { subject.stop.should be false }
     end
   end
 
@@ -282,11 +282,11 @@ describe RTP::Receiver do
 
     context "multicast" do
       context "multicast_address given" do
-        pending
+        skip
       end
 
       context "multicast_address not given" do
-        pending
+        skip
       end
     end
   end
