@@ -31,7 +31,7 @@ GEM
       text-table (>= 1.2.2)
     term-ansicolor (1.0.7)
     text-table (1.2.2)
-    yard (0.8.3)
+    yard (0.9.25)
 
 PLATFORMS
   java
