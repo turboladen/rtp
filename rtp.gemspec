@@ -18,7 +18,7 @@ Gem::Specification.new do |s|
   s.test_files = Dir.glob("spec/**/*")
   s.require_paths = %w(lib)
 
-  s.add_dependency "bindata", "~> 1.4"
+  s.add_dependency "bindata", ">= 1.4", "< 3.0"
   s.add_dependency "log_switch", ">=0.4.0"
 
   s.add_development_dependency "bundler"
